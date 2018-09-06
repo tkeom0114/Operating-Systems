@@ -166,7 +166,10 @@ thread_print_stats (void)
 
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
-   Priority scheduling is the goal of Problem 1-3. */
+   Priority scheduling is the goal of Problem 1-3. 
+Fix it comparing priority with current thread.
+Fixed by Taekang Eom
+Time:09/06 20:32*/
 tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
@@ -205,6 +208,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
+  test_max_priority ();  //added
 
   return tid;
 }
@@ -336,11 +340,15 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
+/* Sets the current thread's priority to NEW_PRIORITY.
+Fix it comparing priority with max priority thread.
+Fixed by Taekang Eom
+Time:09/06 20:32 */
 void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  test_max_priority ();  //added
 }
 
 /* Returns the current thread's priority. */
@@ -488,18 +496,29 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
+//added at 09/06 20:16
+static bool cmp_priority (const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED);
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
-   idle_thread. */
+   idle_thread.
+Fixed by Taekang
+Time:09/06 20:16 */
 static struct thread *
 next_thread_to_run (void) 
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  else //fixed
+  {
+    struct list_elem *e = list_max (&ready_list, cmp_priority, 0);
+    struct thread *t = list_entry (e, struct thread, elem);
+    list_remove(e);
+    return t;
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -638,6 +657,32 @@ static bool cmp_wakeup_time (const struct list_elem *a,
     return true;
   else
     return false;
+}
+
+/*Compare priority of two threads.
+Author:Taekang Eom
+Time:09/06 17:47*/
+static bool cmp_priority (const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED)
+{
+  struct thread *t = list_entry(a, struct thread, elem);
+  struct thread *s = list_entry(b, struct thread, elem);
+  if (t->priority < s->priority)
+    return true;
+  else
+    return false;
+}
+
+/*If current thread hasn't max priority, yield cpu to max priority thread.
+Author:Taekang Eom
+Time:09/06 20:25*/
+void test_max_priority()
+{
+  struct list_elem *e = list_max (&ready_list, cmp_priority, 0);
+  struct thread *t = list_entry (e, struct thread, elem);
+  if(thread_current ()->priority < t->priority )
+    thread_yield ();
 }
 
 
