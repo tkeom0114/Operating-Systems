@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/fixed_point.h"//added at 09/06 21:46
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -101,7 +102,10 @@ struct thread
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
     
-    int64_t wakeup_time;                /*when thread should be wakeup.(added)*/
+    int64_t wakeup_time;                /*when thread should be wakeup. Added at 09/06 17:40*/
+    int nice;                           //niceness of thread, added at added at 09/06 21:49
+    fixed_t recent_cpu;                 //recent cpu, added at added at 09/06 21:48
+
   };
 
 /* If false (default), use round-robin scheduler.
@@ -142,5 +146,12 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+void thread_mlfqs_increase_recent_cpu (void);//added at 09/07 14:36
+void thread_mlfqs_calculate_priority (struct thread *t);//added at 09/07 14:22
+void thread_mlfqs_calculate_recent_cpu (struct thread *t);//added at 09/07 14:22
+void mlfqs_calculate_load_avg (void);//added at 09/07 14:22
+void thread_mlfqs_calculate_every_second (void);//added at 09/07 15:15
+void test_max_priority(void);//added at 09/07 14:49
+
 
 #endif /* threads/thread.h */

@@ -94,7 +94,7 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  thread_sleep(ticks);
+  thread_sleep (ticks);
   //while (timer_elapsed (start) < ticks) 
     //thread_yield ();
 }
@@ -171,13 +171,25 @@ timer_print_stats (void)
 
 /* Timer interrupt handler. 
 Fixed by Taekang Eom
-Time09/06 19:36*/
+Time:09/07 14:39*/
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
-  thread_wakeup(ticks);//added
+  thread_wakeup(ticks);//added at 09/06 19:36
+  if (thread_mlfqs)//added at 09/07 14:39
+  { 
+    thread_mlfqs_increase_recent_cpu ();
+    if (ticks % TIMER_FREQ == 0)
+    {
+      thread_mlfqs_calculate_every_second ();
+    }
+    else if(ticks % 4 ==0)
+    {
+      thread_mlfqs_calculate_priority (thread_current ());
+    }
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -250,3 +262,5 @@ real_time_delay (int64_t num, int32_t denom)
   ASSERT (denom % 1000 == 0);
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
 }
+
+//pintos -v -k -T 480 --qemu  -- -q -mlfqs run mlfqs-load-avg

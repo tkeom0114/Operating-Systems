@@ -11,6 +11,7 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixed_point.h"//added at 09/07 09:39
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -40,6 +41,9 @@ static struct thread *initial_thread;
 
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
+
+/*load average, added at added at 09/06 21:48*/
+static fixed_t load_avg;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
@@ -97,6 +101,7 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&sleep_list); //added at 09/06 17:42
+  load_avg = FIXED(0);  //added at 09/07 09:53
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -358,35 +363,124 @@ thread_get_priority (void)
   return thread_current ()->priority;
 }
 
-/* Sets the current thread's nice value to NICE. */
-void
-thread_set_nice (int nice UNUSED) 
-{
-  /* Not yet implemented. */
+
+
+/*Calculate priority of thread in mlfps case.
+Author:Taekang Eom
+Time:09/07 10:03
+Fixed at 09/07 15:43*/
+void thread_mlfqs_calculate_priority (struct thread *t)
+{ 
+  if(t == idle_thread) return;//added at 09/07 15:43
+  fixed_t a = FP_MIXDIV(t->recent_cpu, 4);
+  a = FP_MIXADD(a, t->nice * 2);
+  int priority = INT(FP_MINUS(FIXED(PRI_MAX),a));
+  if(priority > PRI_MAX)
+    t->priority = PRI_MAX;
+  else if(priority < PRI_MIN)
+    t->priority = PRI_MIN;
+  else
+    t->priority = priority;
 }
 
-/* Returns the current thread's nice value. */
+/*Increase recent cpu of current thread if it is not idle.
+Author:Taekang Eom
+Time:09/07 14:32*/
+void thread_mlfqs_increase_recent_cpu ()
+{ 
+  struct thread *t = thread_current ();
+  if(t != idle_thread)
+    t->recent_cpu = FP_MIXADD(t->recent_cpu,1);
+}
+
+/*Calculate recent cpu of thread in mlfps case.
+Author:Taekang Eom
+Time:09/07 14:00
+Fixed at 09/07 15:43*/
+void thread_mlfqs_calculate_recent_cpu (struct thread *t)
+{ 
+  fixed_t a = FP_MIXMUL(load_avg,2); // a == 2*load_avg
+  a = FP_DIV(a,FP_MIXADD(a,1));      // a == (2*load_avg)/(2*load_avg +1)
+  a = FP_MUL(a,t->recent_cpu);       // a == (2*load_avg)/(2*load_avg +1) * recent_cpu
+  t->recent_cpu = FP_MIXADD(a,t->nice);
+  
+}
+
+/*Calculate load_average in mlfps case.
+Author:Taekang Eom
+Time:09/07 14:13*/
+void mlfqs_calculate_load_avg ()
+{ 
+  size_t ready_threads = list_size(&ready_list);
+  if(thread_current () != idle_thread)
+    ready_threads++;
+  fixed_t a = FP_MIXDIV(FP_MIXMUL(load_avg,59),60);
+  fixed_t b = FP_MIXDIV(FIXED(ready_threads),60);
+  load_avg = FP_ADD(a,b);
+}
+
+/*Calculate all values per second.
+Author:Taekang Eom
+Time:09/07 15:09
+Fixed at 09/07 20:48*/
+void thread_mlfqs_calculate_every_second ()
+{
+  mlfqs_calculate_load_avg ();
+  struct list_elem *e;
+  for (e = list_begin (&all_list); e != list_end (&all_list);
+       e = list_next (e))
+  {
+    struct thread *t = list_entry (e, struct thread, allelem);//fixed at 09/07 20:48
+    if(t != idle_thread)
+    {
+      thread_mlfqs_calculate_recent_cpu (t);
+      thread_mlfqs_calculate_priority (t);
+    }
+  } 
+}
+
+
+
+/* Sets the current thread's nice value to NICE and test preempt.
+Fixed by Taekang Eom
+Time:09/07 13:50 */
+void
+thread_set_nice (int nice) 
+{
+  enum intr_level old_level = intr_disable ();
+  struct thread *t = thread_current ();
+  t->nice = nice;
+  thread_mlfqs_calculate_priority (t);
+  test_max_priority ();
+  intr_set_level (old_level);
+}
+
+/* Returns the current thread's nice value. 
+Fixed by Taekang Eom
+Time:09/07 09:39*/
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current ()->nice;
 }
 
-/* Returns 100 times the system load average. */
+/* Returns 100 times the system load average. 
+Fixed by Taekang Eom
+Time:09/07 09:39*/
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return ROUND(FP_MIXMUL(load_avg,100));
 }
 
-/* Returns 100 times the current thread's recent_cpu value. */
+/* Returns 100 times the current thread's recent_cpu value. 
+Fixed by Taekang Eom
+Time:09/07 09:39*/
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  fixed_t f = thread_current ()->recent_cpu;
+  return ROUND(FP_MIXMUL(f,100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -460,7 +554,9 @@ is_thread (struct thread *t)
 }
 
 /* Does basic initialization of T as a blocked thread named
-   NAME. */
+   NAME. 
+Fixed by Taekang Eom
+Time:09/07 10:29*/
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
@@ -476,7 +572,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  t->wakeup_time = INT64_MAX;    //added at 09-06 18:10
+  //t->wakeup_time = INT64_MAX;    //added at 09/06 18:10
+  t->nice = 0;                   //added at 09/07 10:29
+  t->recent_cpu = FIXED(0);      //added at 09/07 10:29
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -500,7 +598,7 @@ alloc_frame (struct thread *t, size_t size)
 static bool cmp_priority (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED);
-/* Chooses and returns the next thread to be scheduled.  Should
+/* Chooses and returns the next thread to be scheduled(by considering priority).  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
@@ -512,7 +610,7 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else //fixed
+  else //fixed at 09/06 20:16
   {
     struct list_elem *e = list_max (&ready_list, cmp_priority, 0);
     struct thread *t = list_entry (e, struct thread, elem);
@@ -611,10 +709,11 @@ static bool cmp_wakeup_time (const struct list_elem *a,
 /*Make sleep(block) thread and setting wakeup time.
 Author:Taekang Eom
 Time:09/06 17:57*/
-void thread_sleep(int64_t ticks)
+void thread_sleep (int64_t ticks)
 {
-  enum intr_level old_level = intr_disable ();
   struct thread *t = thread_current();
+  ASSERT(t != idle_thread);
+  enum intr_level old_level = intr_disable ();
   t->wakeup_time =  timer_ticks () + ticks;
   list_insert_ordered (&sleep_list, &t->elem, cmp_wakeup_time, 0);
   thread_block ();
@@ -623,26 +722,25 @@ void thread_sleep(int64_t ticks)
 
 /*Wakeup thread at setting wakeup time.
 Author:Taekang Eom
-Time:09/06 19:12*/
+Time:09/06 19:12
+Fixed at 09/07 15:13*/
 void thread_wakeup(int64_t ticks)
-{ 
-  enum intr_level old_level = intr_disable ();
-  if(list_empty(&sleep_list)) return;
-  struct list_elem *e = list_front(&sleep_list);
+{
+  //enum intr_level old_level = intr_disable ();
+  struct list_elem *e = list_begin(&sleep_list);//fixed(front to begin)
   while (e != list_end (&sleep_list)) 
   { 
-    struct thread *t = list_entry(e, struct thread, elem);
-    if(t->wakeup_time <= ticks)
-    {
-      e = list_remove (e);
-      thread_unblock (t); 
-      t->wakeup_time = INT64_MAX;
-    }
-    else break;
+    struct thread *t = list_entry(e, struct thread, elem); 
+    if(ticks < t->wakeup_time)
+      break;
+    e = list_remove (e);
+    thread_unblock (t); 
+    t->wakeup_time = INT64_MAX; 
   }
-  intr_set_level (old_level);
-  
+  //intr_set_level (old_level);
 }
+
+
 
 /*Compare wakeup time of two threads.
 Author:Taekang Eom
@@ -690,3 +788,5 @@ void test_max_priority()
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+//pintos -v -k -T 480 --qemu  -- -q -mlfqs run mlfqs-recent-1
