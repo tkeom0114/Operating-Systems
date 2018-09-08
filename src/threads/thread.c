@@ -595,7 +595,7 @@ alloc_frame (struct thread *t, size_t size)
 }
 
 //added at 09/06 20:16
-static bool cmp_priority (const struct list_elem *a,
+bool cmp_priority (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED);
 /* Chooses and returns the next thread to be scheduled(by considering priority).  Should
@@ -759,10 +759,11 @@ static bool cmp_wakeup_time (const struct list_elem *a,
 
 /*Compare priority of two threads.
 Author:Taekang Eom
-Time:09/06 17:47*/
-static bool cmp_priority (const struct list_elem *a,
+Time:09/06 17:47
+Fixed at 09/08 18:49*/
+bool cmp_priority (const struct list_elem *a,
                              const struct list_elem *b,
-                             void *aux UNUSED)
+                             void *aux UNUSED)//fixed at 09/08 18:49(delete static)
 {
   struct thread *t = list_entry(a, struct thread, elem);
   struct thread *s = list_entry(b, struct thread, elem);

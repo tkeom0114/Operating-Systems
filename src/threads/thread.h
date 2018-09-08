@@ -152,6 +152,9 @@ void thread_mlfqs_calculate_recent_cpu (struct thread *t);//added at 09/07 14:22
 void mlfqs_calculate_load_avg (void);//added at 09/07 14:22
 void thread_mlfqs_calculate_every_second (void);//added at 09/07 15:15
 void test_max_priority(void);//added at 09/07 14:49
+bool cmp_priority (const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED);//added at 09/08 18:51
 
 
 #endif /* threads/thread.h */
