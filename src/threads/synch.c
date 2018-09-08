@@ -104,7 +104,9 @@ sema_try_down (struct semaphore *sema)
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
-   This function may be called from an interrupt handler. */
+   This function may be called from an interrupt handler. 
+Fixed by Taekang Eom
+Time:09/08 10:17*/
 void
 sema_up (struct semaphore *sema) 
 {
@@ -117,6 +119,7 @@ sema_up (struct semaphore *sema)
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
   sema->value++;
+  test_max_priority ();//added at 09/08 10:17
   intr_set_level (old_level);
 }
 
