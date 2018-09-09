@@ -214,7 +214,6 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
   test_max_priority ();  //added
-
   return tid;
 }
 
@@ -345,15 +344,43 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+
+
+/*Change priority of thread when this thread change lock in priority donation
+situation.
+Author: Taekang Eom
+Time:09/09 16:30*/
+void 
+thread_update_priority_donation (struct thread *t)
+{
+  enum intr_level old_level = intr_disable ();
+  int priority = t->base_priority;
+  int lock_priority;
+  if(!list_empty (&t->lock_list))
+  {
+    struct list_elem *e = list_max(&t->lock_list,cmp_lock_priority,0);
+    lock_priority = list_entry(e,struct lock,elem)->max_priority;
+    if (lock_priority > priority)
+      priority = lock_priority;
+  }
+  t->priority = priority;
+  intr_set_level (old_level);
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY.
 Fix it comparing priority with max priority thread.
 Fixed by Taekang Eom
-Time:09/06 20:32 */
+Time:09/09 17:43 */
 void
 thread_set_priority (int new_priority) 
 {
+  if(thread_mlfqs)
+    return;
   thread_current ()->priority = new_priority;
-  test_max_priority ();  //added
+  enum intr_level old_level = intr_disable ();   //added
+  thread_current ()->base_priority = new_priority;
+  thread_update_priority_donation (thread_current ());//added at 09/09 17:43
+  test_max_priority ();  //added at 09/06 20:32
 }
 
 /* Returns the current thread's priority. */
@@ -571,10 +598,14 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->base_priority = priority;  //added at 09/09 12:21
+  t->waiting_lock = NULL;        //added at 09/09 12:21
   t->magic = THREAD_MAGIC;
-  //t->wakeup_time = INT64_MAX;    //added at 09/06 18:10
+  t->wakeup_time = INT64_MAX;    //added at 09/06 18:10
   t->nice = 0;                   //added at 09/07 10:29
   t->recent_cpu = FIXED(0);      //added at 09/07 10:29
+  list_init (&t->lock_list);     //added at 09/09 16:27
+
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
@@ -773,6 +804,21 @@ bool cmp_priority (const struct list_elem *a,
     return false;
 }
 
+/*Compare max priority of two locks.
+Author:Taekang Eom
+Time:09/09 16:41*/
+bool cmp_lock_priority (const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED)
+{
+  struct lock *l = list_entry(a, struct lock, elem);
+  struct lock *m = list_entry(b, struct lock, elem);
+  if (l->max_priority < m->max_priority)
+    return true;
+  else
+    return false;
+}
+
 /*If current thread hasn't max priority, yield cpu to max priority thread.
 Author:Taekang Eom
 Time:09/06 20:25*/
@@ -785,9 +831,13 @@ void test_max_priority()
 }
 
 
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
+
 
 //pintos -v -k -T 480 --qemu  -- -q -mlfqs run mlfqs-recent-1

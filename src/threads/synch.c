@@ -119,8 +119,10 @@ sema_up (struct semaphore *sema)
 
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) 
+  {
     thread_unblock (list_entry (list_pop_back (&sema->waiters),
                                 struct thread, elem));//fixed at 09/08 18:55
+  }
   sema->value++;
   test_max_priority ();//added at 09/08 10:17
   intr_set_level (old_level);
@@ -194,16 +196,48 @@ lock_init (struct lock *lock)
    This function may sleep, so it must not be called within an
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
-   we need to sleep. */
+   we need to sleep. 
+Fixed by Taekang Eom
+Time: 09/09 12:25*/
 void
 lock_acquire (struct lock *lock)
 {
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
+  
+  
 
+  enum intr_level old_level = intr_disable ();
+  if (!thread_mlfqs && (lock->holder != NULL)) //added at 09/09 12:25(priority donation)
+  {
+    thread_current ()->waiting_lock = lock;//moved at 09/09 16:47
+    struct thread *t = thread_current ();
+    struct lock *cur_lock = t->waiting_lock;
+    while(cur_lock != NULL)
+    {  
+      if (t->priority > cur_lock->max_priority)//fixed at 09/09 17:23
+        {
+          cur_lock->max_priority = t->priority;
+          thread_update_priority_donation (cur_lock->holder);
+        }
+      t = cur_lock->holder;
+      cur_lock = t->waiting_lock;
+    }
+  }
+  
+  intr_set_level (old_level);
   sema_down (&lock->semaphore);
+  old_level = intr_disable ();
+  if (!thread_mlfqs)
+  { 
+    struct thread *t = thread_current ();
+    t->waiting_lock = NULL;  //added at 09/09 12:25
+    lock->max_priority = t->priority;
+    list_insert_ordered (&t->lock_list, &lock->elem, cmp_lock_priority, 0);
+  }
   lock->holder = thread_current ();
+  intr_set_level (old_level);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -230,15 +264,22 @@ lock_try_acquire (struct lock *lock)
 
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
-   handler. */
+   handler. 
+Fixed by Taekang Eom
+Time: 09/09 12:45*/
 void
 lock_release (struct lock *lock) 
 {
   ASSERT (lock != NULL);
-  ASSERT (lock_held_by_current_thread (lock));
-
+  ASSERT (lock_held_by_current_thread (lock));  
+  if(!thread_mlfqs)//added at 09/09 12:45,fixed at 09/09 16:47
+  {
+    list_remove(&lock->elem);
+    thread_update_priority_donation (thread_current ());
+  }
   lock->holder = NULL;
   sema_up (&lock->semaphore);
+
 }
 
 /* Returns true if the current thread holds LOCK, false
