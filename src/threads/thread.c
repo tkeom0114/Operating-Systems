@@ -377,10 +377,11 @@ thread_set_priority (int new_priority)
   if(thread_mlfqs)
     return;
   thread_current ()->priority = new_priority;
-  enum intr_level old_level = intr_disable ();   //added
+  enum intr_level old_level = intr_disable ();   //added at 09/12 10:54
   thread_current ()->base_priority = new_priority;
   thread_update_priority_donation (thread_current ());//added at 09/09 17:43
   test_max_priority ();  //added at 09/06 20:32
+  intr_set_level (old_level); //added at 09/12 10:54
 }
 
 /* Returns the current thread's priority. */
