@@ -319,8 +319,8 @@ static bool cmp_sema_priority (const struct list_elem *a,
 {
   struct semaphore_elem *c = list_entry(a, struct semaphore_elem, elem);
   struct semaphore_elem *d = list_entry(b, struct semaphore_elem, elem);
-  struct thread *t = list_entry(list_back (&c->semaphore.waiters), struct thread, elem);
-  struct thread *s = list_entry(list_back (&d->semaphore.waiters), struct thread, elem);
+  struct thread *t = list_entry(list_max (&c->semaphore.waiters, cmp_priority, 0), struct thread, elem);
+  struct thread *s = list_entry(list_max (&d->semaphore.waiters, cmp_priority, 0), struct thread, elem);
   if (t->priority < s->priority)
     return true;
   else
