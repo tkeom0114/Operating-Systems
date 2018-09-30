@@ -217,9 +217,9 @@ lock_acquire (struct lock *lock)
     struct lock *cur_lock = t->waiting_lock;
     while(cur_lock != NULL)
     {  
-      if (t->priority > cur_lock->max_priority)//fixed at 09/09 17:23
+      if (t->priority > cur_lock->lock_priority)//fixed at 09/09 17:23
         {
-          cur_lock->max_priority = t->priority;
+          cur_lock->lock_priority = t->priority;
           thread_update_priority_donation (cur_lock->holder);
         }
       t = cur_lock->holder;
@@ -234,7 +234,15 @@ lock_acquire (struct lock *lock)
   { 
     struct thread *t = thread_current ();
     t->waiting_lock = NULL;  //added at 09/09 12:25
-    lock->max_priority = t->priority;
+    if(list_empty(&lock->semaphore.waiters))
+      lock->lock_priority = t->priority;
+    else
+    {
+      struct list_elem *e = list_max (&lock->semaphore.waiters, cmp_priority, 0);
+      struct thread *s = list_entry(e, struct thread, elem);
+      lock->lock_priority = s->priority;
+    }
+    
     list_push_back (&t->lock_list, &lock->elem);
   }
   lock->holder = thread_current ();

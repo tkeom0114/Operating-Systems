@@ -361,7 +361,7 @@ thread_update_priority_donation (struct thread *t)
   if(!list_empty (&t->lock_list))
   {
     struct list_elem *e = list_max(&t->lock_list,cmp_lock_priority,0);
-    lock_priority = list_entry(e,struct lock,elem)->max_priority;
+    lock_priority = list_entry(e,struct lock,elem)->lock_priority;
     if (lock_priority > priority)
       priority = lock_priority;
   }
@@ -816,7 +816,7 @@ bool cmp_lock_priority (const struct list_elem *a,
 {
   struct lock *l = list_entry(a, struct lock, elem);
   struct lock *m = list_entry(b, struct lock, elem);
-  if (l->max_priority < m->max_priority)
+  if (l->lock_priority < m->lock_priority)
     return true;
   else
     return false;
