@@ -84,10 +84,15 @@ start_process (void *file_name_)
    immediately, without waiting.
 
    This function will be implemented in problem 2-2.  For now, it
-   does nothing. */
+   does nothing.
+   I made infinite loop in temporary.
+   Fixed by Taekang Eom
+   Time: 09/27 21:53 */
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  while(1)//set infinite loop temporary
+  {;}
   return -1;
 }
 

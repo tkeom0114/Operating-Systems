@@ -176,7 +176,6 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_tick ();
   thread_wakeup(ticks);//added at 09/06 19:36
   if (thread_mlfqs)//added at 09/07 14:39
   { 
@@ -190,6 +189,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
       thread_mlfqs_calculate_priority (thread_current ());
     }
   }
+  thread_tick ();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

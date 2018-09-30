@@ -211,9 +211,11 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
-  /* Add to run queue. */
+  /* Add to run queue and test priority with current thread
+   and preempt if not advanced scheduler. */
   thread_unblock (t);
-  test_max_priority ();  //added
+  if(!thread_mlfqs)//fixed at 09/13 13:37
+    test_max_priority ();
   return tid;
 }
 
