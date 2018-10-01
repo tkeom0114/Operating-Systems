@@ -360,7 +360,7 @@ thread_update_priority_donation (struct thread *t)
   int lock_priority;
   if(!list_empty (&t->lock_list))
   {
-    struct list_elem *e = list_max(&t->lock_list,cmp_lock_priority,0);
+    struct list_elem *e = list_max(&t->lock_list,compare_lock_priority,0);
     lock_priority = list_entry(e,struct lock,elem)->lock_priority;
     if (lock_priority > priority)
       priority = lock_priority;
@@ -629,7 +629,7 @@ alloc_frame (struct thread *t, size_t size)
 }
 
 //added at 09/06 20:16
-bool cmp_priority (const struct list_elem *a,
+bool compare_priority (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED);
 /* Chooses and returns the next thread to be scheduled(by considering priority).  Should
@@ -646,7 +646,7 @@ next_thread_to_run (void)
     return idle_thread;
   else //fixed at 09/06 20:16
   {
-    struct list_elem *e = list_max (&ready_list, cmp_priority, 0);
+    struct list_elem *e = list_max (&ready_list, compare_priority, 0);
     struct thread *t = list_entry (e, struct thread, elem);
     list_remove(e);
     return t;
@@ -736,7 +736,7 @@ allocate_tid (void)
   return tid;
 }
 
-static bool cmp_wakeup_time (const struct list_elem *a,
+static bool compare_wakeup_time (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED);//added at 09/06 19:39
 
@@ -749,7 +749,7 @@ void thread_sleep (int64_t ticks)
   ASSERT(t != idle_thread);
   enum intr_level old_level = intr_disable ();
   t->wakeup_time =  timer_ticks () + ticks;
-  list_insert_ordered (&sleep_list, &t->elem, cmp_wakeup_time, 0);
+  list_insert_ordered (&sleep_list, &t->elem, compare_wakeup_time, 0);
   thread_block ();
   intr_set_level (old_level);
 }
@@ -779,7 +779,7 @@ void thread_wakeup(int64_t ticks)
 /*Compare wakeup time of two threads.
 Author:Taekang Eom
 Time:09/06 17:47*/
-static bool cmp_wakeup_time (const struct list_elem *a,
+static bool compare_wakeup_time (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED)
 {
@@ -795,7 +795,7 @@ static bool cmp_wakeup_time (const struct list_elem *a,
 Author:Taekang Eom
 Time:09/06 17:47
 Fixed at 09/08 18:49*/
-bool cmp_priority (const struct list_elem *a,
+bool compare_priority (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED)//fixed at 09/08 18:49(delete static)
 {
@@ -810,7 +810,7 @@ bool cmp_priority (const struct list_elem *a,
 /*Compare max priority of two locks.
 Author:Taekang Eom
 Time:09/09 16:41*/
-bool cmp_lock_priority (const struct list_elem *a,
+bool compare_lock_priority (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED)
 {
@@ -827,7 +827,7 @@ Author:Taekang Eom
 Time:09/06 20:25*/
 void test_max_priority()
 {
-  struct list_elem *e = list_max (&ready_list, cmp_priority, 0);
+  struct list_elem *e = list_max (&ready_list, compare_priority, 0);
   struct thread *t = list_entry (e, struct thread, elem);
   if(thread_current ()->priority < t->priority )
     thread_yield ();

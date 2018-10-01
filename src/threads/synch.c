@@ -119,7 +119,7 @@ sema_up (struct semaphore *sema)
   old_level = intr_disable ();
   if (!list_empty (&sema->waiters)) //fixed at 09/09 20:35
   {
-    struct list_elem *e = list_max (&sema->waiters, cmp_priority, 0);
+    struct list_elem *e = list_max (&sema->waiters, compare_priority, 0);
     struct thread *t = list_entry(e, struct thread, elem);
     list_remove (e);
     thread_unblock (t);
@@ -238,7 +238,7 @@ lock_acquire (struct lock *lock)
       lock->lock_priority = t->priority;
     else
     {
-      struct list_elem *e = list_max (&lock->semaphore.waiters, cmp_priority, 0);
+      struct list_elem *e = list_max (&lock->semaphore.waiters, compare_priority, 0);
       struct thread *s = list_entry(e, struct thread, elem);
       lock->lock_priority = s->priority;
     }
@@ -313,14 +313,14 @@ struct semaphore_elem
 /*Compare maximum priority in semaphore.
 Author:Taekang Eom
 Time:09/08 19:17*/
-static bool cmp_sema_priority (const struct list_elem *a,
+static bool compare_sema_priority (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED)
 {
   struct semaphore_elem *c = list_entry(a, struct semaphore_elem, elem);
   struct semaphore_elem *d = list_entry(b, struct semaphore_elem, elem);
-  struct thread *t = list_entry(list_max (&c->semaphore.waiters, cmp_priority, 0), struct thread, elem);
-  struct thread *s = list_entry(list_max (&d->semaphore.waiters, cmp_priority, 0), struct thread, elem);
+  struct thread *t = list_entry(list_max (&c->semaphore.waiters, compare_priority, 0), struct thread, elem);
+  struct thread *s = list_entry(list_max (&d->semaphore.waiters, compare_priority, 0), struct thread, elem);
   if (t->priority < s->priority)
     return true;
   else
@@ -385,7 +385,7 @@ cond_wait (struct condition *cond, struct lock *lock)
    make sense to try to signal a condition variable within an
    interrupt handler.
 Fixed by Taekang Eom(fixed it because when semaphore_elem pushed, 
-it has no threads in semaphore, so didn't use cmp_sema_priority in cond_wait
+it has no threads in semaphore, so didn't use compare_sema_priority in cond_wait
 Time:09/08 19:55*/
 void
 cond_signal (struct condition *cond, struct lock *lock UNUSED) 
@@ -397,7 +397,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
 
   if (!list_empty (&cond->waiters)) //fixed at 09/08 19:55
   {
-    struct list_elem *e = list_max (&cond->waiters, cmp_sema_priority, 0);
+    struct list_elem *e = list_max (&cond->waiters, compare_sema_priority, 0);
     struct semaphore_elem *a = list_entry (e, struct semaphore_elem, elem);
     list_remove (e);
     sema_up (&a->semaphore);
