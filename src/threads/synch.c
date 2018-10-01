@@ -235,7 +235,7 @@ lock_acquire (struct lock *lock)
     struct thread *t = thread_current ();
     t->waiting_lock = NULL;  //added at 09/09 12:25
     if(list_empty(&lock->semaphore.waiters))
-      lock->lock_priority = t->priority;
+      lock->lock_priority = 0;
     else
     {
       struct list_elem *e = list_max (&lock->semaphore.waiters, compare_priority, 0);
