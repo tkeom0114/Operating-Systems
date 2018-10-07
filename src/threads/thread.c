@@ -378,7 +378,6 @@ thread_set_priority (int new_priority)
 {
   if(thread_mlfqs)
     return;
-  thread_current ()->priority = new_priority;
   enum intr_level old_level = intr_disable ();   //added at 09/12 10:54
   thread_current ()->base_priority = new_priority;
   thread_update_priority_donation (thread_current ());//added at 09/09 17:43
@@ -760,7 +759,6 @@ Time:09/06 19:12
 Fixed at 09/07 15:13*/
 void thread_wakeup(int64_t ticks)
 {
-  //enum intr_level old_level = intr_disable ();
   struct list_elem *e = list_begin(&sleep_list);//fixed(front to begin)
   while (e != list_end (&sleep_list)) 
   { 
@@ -771,7 +769,6 @@ void thread_wakeup(int64_t ticks)
     thread_unblock (t); 
     t->wakeup_time = INT64_MAX; 
   }
-  //intr_set_level (old_level);
 }
 
 
@@ -840,7 +837,3 @@ void test_max_priority()
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-
-
-
-//pintos -v -k -T 480 --qemu  -- -q -mlfqs run mlfqs-recent-1

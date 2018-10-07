@@ -24,11 +24,13 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
-   thread id, or TID_ERROR if the thread cannot be created. */
+   thread id, or TID_ERROR if the thread cannot be created. 
+   Fixed by Taekang Eom
+   Time: 10/07  11:32*/
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy;
+  char *fn_copy,*save_ptr,*real_file_name;//fixed at 10/07 11:27
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
@@ -37,9 +39,15 @@ process_execute (const char *file_name)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
-
+  real_file_name = (char *) malloc (strlen (file_name) + 1);
+  if (real_file_name == NULL)
+  {
+    palloc_free_page (fn_copy);
+    return TID_ERROR;
+  }
+  strlcpy (real_file_name, file_name, PGSIZE);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (strtok_r(real_file_name," ",&save_ptr), PRI_DEFAULT, start_process, fn_copy);//fixed at 10/07 11:32
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -51,6 +59,7 @@ static void
 start_process (void *file_name_)
 {
   char *file_name = file_name_;
+  char *save_ptr;
   struct intr_frame if_;
   bool success;
 
@@ -66,6 +75,7 @@ start_process (void *file_name_)
   if (!success) 
     thread_exit ();
 
+  hex_dump(if_.esp,if_.esp,PHYS_BASE-if_.esp,true);
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -91,8 +101,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while(1)//set infinite loop temporary
-  {;}
+  //while(1)//set infinite loop temporary
+  //{;}
   return -1;
 }
 
@@ -200,7 +210,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp,char *file_name);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -209,7 +219,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
    and its initial stack pointer into *ESP.
-   Returns true if successful, false otherwise. */
+   Returns true if successful, false otherwise. 
+   Fixed by Taekang Eom
+   Time: 10/07 17:11*/
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
@@ -219,6 +231,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  //added at 10/07 17:18
+  char *real_file_name;
+  char *save_ptr;
+  strlcpy (real_file_name, file_name, PGSIZE);
+  real_file_name = strtok_r(real_file_name," ",&save_ptr);//added
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -227,10 +244,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (real_file_name);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", file_name);
+      printf ("load: %s: open failed\n", real_file_name);//fixed at 10/07 17:18
       goto done; 
     }
 
@@ -243,7 +260,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
-      printf ("load: %s: error loading executable\n", file_name);
+      printf ("load: %s: error loading executable\n", real_file_name);//fixed at 10/07 17:18
       goto done; 
     }
 
@@ -307,7 +324,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp,file_name))
     goto done;
 
   /* Start address. */
@@ -430,12 +447,21 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
-   user virtual memory. */
+   user virtual memory. 
+   Fixed by Taekang Eom
+   Time: 10/07 17:21*/
 static bool
-setup_stack (void **esp) 
+setup_stack (void **esp, char *file_name) 
 {
   uint8_t *kpage;
   bool success = false;
+  //added at 10/07 17:32
+  int argc = 0;
+  int i;
+  char **parsed_tokens,**argv;
+  char *token;
+  char *fn_copy;
+  char *save_ptr;//added
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -446,6 +472,46 @@ setup_stack (void **esp)
       else
         palloc_free_page (kpage);
     }
+  //added at 10/07 17:32
+  fn_copy = (char*)malloc(strlen(file_name)+1);
+  strlcpy (fn_copy, file_name, PGSIZE);
+  for (token = strtok_r(fn_copy," ",&save_ptr);token != NULL;token = strtok_r(NULL," ",&save_ptr))
+    argc++;
+  parsed_tokens = malloc (argc * sizeof(char*));
+  for (token = strtok_r(fn_copy," ",&save_ptr),i = 0;token != NULL,i < argc;token = strtok_r(NULL," ",&save_ptr),i++)
+  {
+    parsed_tokens[i] = malloc (strlen (token) + 1);
+    strlcpy (parsed_tokens[i], token, strlen (token) + 1);
+  }
+  argv = malloc ((argc + 1) * sizeof(char*));
+  argv[argc] = NULL;
+  for(i = argc - 1;i >= 0; i--)
+  {
+    int length = strlen(parsed_tokens[i]) + 1;
+    *esp -= length;
+    strlcpy (*esp,parsed_tokens[i],length);
+    argv[i] = *esp;
+  }
+  i = (int32_t)*esp % sizeof(char*);
+  if(i)
+  {
+    *esp -= i;
+    memcpy(*esp,&argv[argc],i);
+  }
+  for(i = argc;i >= 0; i--)
+  {
+    *esp -= sizeof(char *);
+    memcpy(*esp,&argv[i],sizeof(char*));
+  }
+  token = *esp;
+  *esp -= sizeof(char**);
+  memcpy(*esp,&token,sizeof(char**));
+  *esp -= sizeof(int);
+  memcpy(*esp,&argc,sizeof(int));
+  *esp -= sizeof(void*);
+  memcpy(*esp,&argv[argc],sizeof(void*));
+  //added
+  
   return success;
 }
 
