@@ -20,7 +20,6 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-//pintos filesys-size=2 -p ../../examples/echo -a echo -- -f -q run 'echo x'
 //pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/args-many -a args-many -- -q  -f run 'args-many a b c'
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -491,6 +490,7 @@ setup_stack (void **esp, char *file_name)
       strlcpy (parsed_tokens[i], token, strlen (token) + 1);
       i++;
     }
+    free(fn_copy_2);
     argv = malloc ((argc + 1) * sizeof(char*));
     argv[argc] = NULL;
     for(i = argc - 1;i >= 0; i--)
