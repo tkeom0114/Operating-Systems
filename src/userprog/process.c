@@ -20,7 +20,8 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-
+//pintos filesys-size=2 -p ../../examples/echo -a echo -- -f -q run 'echo x'
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/args-many -a args-many -- -q  -f run 'args-many a b c'
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -32,7 +33,6 @@ process_execute (const char *file_name)
 {
   char *fn_copy,*save_ptr,*real_file_name;//fixed at 10/07 11:27
   tid_t tid;
-
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -101,8 +101,8 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  //while(1)//set infinite loop temporary
-  //{;}
+  while(1)//set infinite loop temporary
+  {;}
   return -1;
 }
 
@@ -232,7 +232,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
   //added at 10/07 17:18
-  char *real_file_name;
+  char *real_file_name = malloc(strlen(file_name)+1);
   char *save_ptr;
   strlcpy (real_file_name, file_name, PGSIZE);
   real_file_name = strtok_r(real_file_name," ",&save_ptr);//added
@@ -457,11 +457,13 @@ setup_stack (void **esp, char *file_name)
   bool success = false;
   //added at 10/07 17:32
   int argc = 0;
-  int i;
+  int i = 0;
   char **parsed_tokens,**argv;
   char *token;
-  char *fn_copy;
-  char *save_ptr;//added
+  char *fn_copy_1;
+  char *fn_copy_2;
+  char *save_ptr_1;
+  char *save_ptr_2;//added
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -473,43 +475,51 @@ setup_stack (void **esp, char *file_name)
         palloc_free_page (kpage);
     }
   //added at 10/07 17:32
-  fn_copy = (char*)malloc(strlen(file_name)+1);
-  strlcpy (fn_copy, file_name, PGSIZE);
-  for (token = strtok_r(fn_copy," ",&save_ptr);token != NULL;token = strtok_r(NULL," ",&save_ptr))
-    argc++;
-  parsed_tokens = malloc (argc * sizeof(char*));
-  for (token = strtok_r(fn_copy," ",&save_ptr),i = 0;token != NULL,i < argc;token = strtok_r(NULL," ",&save_ptr),i++)
+  if(success)
   {
-    parsed_tokens[i] = malloc (strlen (token) + 1);
-    strlcpy (parsed_tokens[i], token, strlen (token) + 1);
+    fn_copy_1 = (char*)malloc(strlen(file_name)+1);
+    strlcpy (fn_copy_1, file_name, PGSIZE);
+    fn_copy_2 = (char*)malloc(strlen(file_name)+1);
+    strlcpy (fn_copy_2, file_name, PGSIZE);
+    for (token = strtok_r(fn_copy_1," ",&save_ptr_1);token != NULL;token = strtok_r(NULL," ",&save_ptr_1))
+      argc++;
+    free(fn_copy_1);
+    parsed_tokens = calloc (argc,sizeof(char*));
+    for (token = strtok_r(fn_copy_2," ",&save_ptr_2);token != NULL;token = strtok_r(NULL," ",&save_ptr_2))
+    {
+      parsed_tokens[i] = malloc (strlen (token) + 1);
+      strlcpy (parsed_tokens[i], token, strlen (token) + 1);
+      i++;
+    }
+    argv = malloc ((argc + 1) * sizeof(char*));
+    argv[argc] = NULL;
+    for(i = argc - 1;i >= 0; i--)
+    {
+      int length = strlen(parsed_tokens[i]) + 1;
+      *esp -= length;
+      memcpy (*esp,parsed_tokens[i],length);
+      argv[i] = *esp;
+    }
+    i = (int32_t)*esp % sizeof(char*);
+    if(i)
+    {
+      *esp -= i;
+      memcpy(*esp,&argv[argc],i);
+    }
+    for(i = argc;i >= 0; i--)
+    {
+      *esp -= sizeof(char *);
+      memcpy(*esp,&argv[i],sizeof(char*));
+    }
+    token = *esp;
+    *esp -= sizeof(char**);
+    memcpy(*esp,&token,sizeof(char**));
+    *esp -= sizeof(int);
+    memcpy(*esp,&argc,sizeof(int));
+    *esp -= sizeof(void*);
+    memcpy(*esp,&argv[argc],sizeof(void*));
   }
-  argv = malloc ((argc + 1) * sizeof(char*));
-  argv[argc] = NULL;
-  for(i = argc - 1;i >= 0; i--)
-  {
-    int length = strlen(parsed_tokens[i]) + 1;
-    *esp -= length;
-    strlcpy (*esp,parsed_tokens[i],length);
-    argv[i] = *esp;
-  }
-  i = (int32_t)*esp % sizeof(char*);
-  if(i)
-  {
-    *esp -= i;
-    memcpy(*esp,&argv[argc],i);
-  }
-  for(i = argc;i >= 0; i--)
-  {
-    *esp -= sizeof(char *);
-    memcpy(*esp,&argv[i],sizeof(char*));
-  }
-  token = *esp;
-  *esp -= sizeof(char**);
-  memcpy(*esp,&token,sizeof(char**));
-  *esp -= sizeof(int);
-  memcpy(*esp,&argc,sizeof(int));
-  *esp -= sizeof(void*);
-  memcpy(*esp,&argv[argc],sizeof(void*));
+  
   //added
   
   return success;
