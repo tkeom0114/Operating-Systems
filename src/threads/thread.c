@@ -11,7 +11,8 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
-#include "threads/fixed_point.h"//added at 09/07 09:39
+#include "threads/fixed_point.h"
+#include "devices/timer.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -172,9 +173,7 @@ thread_print_stats (void)
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. 
-Fix it comparing priority with current thread.
-Fixed by Taekang Eom
-Time:09/06 20:32*/
+  Fix it comparing priority with current thread. */
 tid_t
 thread_create (const char *name, int priority,
                thread_func *function, void *aux) 
@@ -214,7 +213,7 @@ thread_create (const char *name, int priority,
   /* Add to run queue and test priority with current thread
    and preempt if not advanced scheduler. */
   thread_unblock (t);
-  if(!thread_mlfqs)//fixed at 09/13 13:37
+  if(!thread_mlfqs)
     test_max_priority ();
   return tid;
 }
@@ -349,9 +348,7 @@ thread_foreach (thread_action_func *func, void *aux)
 
 
 /*Change priority of thread when this thread change lock in priority donation
-situation.
-Author: Taekang Eom
-Time:09/09 16:30*/
+situation. */
 void 
 thread_update_priority_donation (struct thread *t)
 {
@@ -370,20 +367,18 @@ thread_update_priority_donation (struct thread *t)
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY.
-Fix it comparing priority with max priority thread.
-Fixed by Taekang Eom
-Time:09/09 17:43 */
+Fix it comparing priority with max priority thread.  */
 void
 thread_set_priority (int new_priority) 
 {
   if(thread_mlfqs)
     return;
   thread_current ()->priority = new_priority;
-  enum intr_level old_level = intr_disable ();   //added at 09/12 10:54
+  enum intr_level old_level = intr_disable (); 
   thread_current ()->base_priority = new_priority;
-  thread_update_priority_donation (thread_current ());//added at 09/09 17:43
-  test_max_priority ();  //added at 09/06 20:32
-  intr_set_level (old_level); //added at 09/12 10:54
+  thread_update_priority_donation (thread_current ());
+  intr_set_level (old_level); 
+  test_max_priority (); 
 }
 
 /* Returns the current thread's priority. */
@@ -395,16 +390,13 @@ thread_get_priority (void)
 
 
 
-/*Calculate priority of thread in mlfps case.
-Author:Taekang Eom
-Time:09/07 10:03
-Fixed at 09/07 15:43*/
+/*Calculate priority of thread in mlfps case. */
 void thread_mlfqs_calculate_priority (struct thread *t)
 { 
-  if(t == idle_thread) return;//added at 09/07 15:43
-  fixed_t a = FP_MIXDIV(t->recent_cpu, 4);
-  a = FP_MIXADD(a, t->nice * 2);
-  int priority = INT(FP_MINUS(FIXED(PRI_MAX),a));
+  if(t == idle_thread) return;//it is not calculated in idle thread
+  fixed_t a = FP_MIXDIV(t->recent_cpu, 4);  //a == recent_cpu/4
+  a = FP_MIXADD(a, t->nice * 2);            //a == recent_cpu/4 + 2*nice
+  int priority = INT(FP_MINUS(FIXED(PRI_MAX),a)); //priority == PRI_MAX - a
   if(priority > PRI_MAX)
     t->priority = PRI_MAX;
   else if(priority < PRI_MIN)
@@ -413,9 +405,7 @@ void thread_mlfqs_calculate_priority (struct thread *t)
     t->priority = priority;
 }
 
-/*Increase recent cpu of current thread if it is not idle.
-Author:Taekang Eom
-Time:09/07 14:32*/
+/*Increase recent cpu of current thread if it is not idle. */
 void thread_mlfqs_increase_recent_cpu ()
 { 
   struct thread *t = thread_current ();
@@ -423,10 +413,7 @@ void thread_mlfqs_increase_recent_cpu ()
     t->recent_cpu = FP_MIXADD(t->recent_cpu,1);
 }
 
-/*Calculate recent cpu of thread in mlfps case.
-Author:Taekang Eom
-Time:09/07 14:00
-Fixed at 09/07 15:43*/
+/*Calculate recent cpu of thread in mlfps case. */
 void thread_mlfqs_calculate_recent_cpu (struct thread *t)
 { 
   fixed_t a = FP_MIXMUL(load_avg,2); // a == 2*load_avg
@@ -436,23 +423,18 @@ void thread_mlfqs_calculate_recent_cpu (struct thread *t)
   
 }
 
-/*Calculate load_average in mlfps case.
-Author:Taekang Eom
-Time:09/07 14:13*/
+/*Calculate load_average in mlfps case.*/
 void mlfqs_calculate_load_avg ()
 { 
   size_t ready_threads = list_size(&ready_list);
-  if(thread_current () != idle_thread)
+  if(thread_current () != idle_thread)//it is not calculated in idle thread
     ready_threads++;
   fixed_t a = FP_MIXDIV(FP_MIXMUL(load_avg,59),60);
   fixed_t b = FP_MIXDIV(FIXED(ready_threads),60);
   load_avg = FP_ADD(a,b);
 }
 
-/*Calculate all values per second.
-Author:Taekang Eom
-Time:09/07 15:09
-Fixed at 09/07 20:48*/
+/*Calculate all values per second. */
 void thread_mlfqs_calculate_every_second ()
 {
   mlfqs_calculate_load_avg ();
@@ -460,7 +442,7 @@ void thread_mlfqs_calculate_every_second ()
   for (e = list_begin (&all_list); e != list_end (&all_list);
        e = list_next (e))
   {
-    struct thread *t = list_entry (e, struct thread, allelem);//fixed at 09/07 20:48
+    struct thread *t = list_entry (e, struct thread, allelem);
     if(t != idle_thread)
     {
       thread_mlfqs_calculate_recent_cpu (t);
@@ -471,9 +453,7 @@ void thread_mlfqs_calculate_every_second ()
 
 
 
-/* Sets the current thread's nice value to NICE and test preempt.
-Fixed by Taekang Eom
-Time:09/07 13:50 */
+/* Sets the current thread's nice value to NICE and test preempt.*/
 void
 thread_set_nice (int nice) 
 {
@@ -485,27 +465,21 @@ thread_set_nice (int nice)
   intr_set_level (old_level);
 }
 
-/* Returns the current thread's nice value. 
-Fixed by Taekang Eom
-Time:09/07 09:39*/
+/* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
   return thread_current ()->nice;
 }
 
-/* Returns 100 times the system load average. 
-Fixed by Taekang Eom
-Time:09/07 09:39*/
+/* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
   return ROUND(FP_MIXMUL(load_avg,100));
 }
 
-/* Returns 100 times the current thread's recent_cpu value. 
-Fixed by Taekang Eom
-Time:09/07 09:39*/
+/* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
@@ -584,9 +558,7 @@ is_thread (struct thread *t)
 }
 
 /* Does basic initialization of T as a blocked thread named
-   NAME. 
-Fixed by Taekang Eom
-Time:09/07 10:29*/
+   NAME. */
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
@@ -601,13 +573,13 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
-  t->base_priority = priority;  //added at 09/09 12:21
-  t->waiting_lock = NULL;        //added at 09/09 12:21
+  t->base_priority = priority;  //added
+  t->waiting_lock = NULL;        //added
   t->magic = THREAD_MAGIC;
-  t->wakeup_time = INT64_MAX;    //added at 09/06 18:10
-  t->nice = 0;                   //added at 09/07 10:29
-  t->recent_cpu = FIXED(0);      //added at 09/07 10:29
-  list_init (&t->lock_list);     //added at 09/09 16:27
+  t->wakeup_time = INT64_MAX;    //added
+  t->nice = 0;                   //added 
+  t->recent_cpu = FIXED(0);      //added
+  list_init (&t->lock_list);     //added
 
 
   old_level = intr_disable ();
@@ -628,7 +600,6 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
-//added at 09/06 20:16
 bool compare_priority (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED);
@@ -636,15 +607,13 @@ bool compare_priority (const struct list_elem *a,
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
-   idle_thread.
-Fixed by Taekang
-Time:09/06 20:16 */
+   idle_thread. */
 static struct thread *
 next_thread_to_run (void) 
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else //fixed at 09/06 20:16
+  else //fixed to consider priority
   {
     struct list_elem *e = list_max (&ready_list, compare_priority, 0);
     struct thread *t = list_entry (e, struct thread, elem);
@@ -741,7 +710,6 @@ static bool compare_wakeup_time (const struct list_elem *a,
                              void *aux UNUSED);//added at 09/06 19:39
 
 /*Make sleep(block) thread and setting wakeup time.
-Author:Taekang Eom
 Time:09/06 17:57*/
 void thread_sleep (int64_t ticks)
 {
@@ -754,14 +722,11 @@ void thread_sleep (int64_t ticks)
   intr_set_level (old_level);
 }
 
-/*Wakeup thread at setting wakeup time.
-Author:Taekang Eom
-Time:09/06 19:12
-Fixed at 09/07 15:13*/
+/*Wakeup thread at setting wakeup time.*/
 void thread_wakeup(int64_t ticks)
 {
-  //enum intr_level old_level = intr_disable ();
-  struct list_elem *e = list_begin(&sleep_list);//fixed(front to begin)
+  enum intr_level old_level = intr_disable ();
+  struct list_elem *e = list_begin(&sleep_list);
   while (e != list_end (&sleep_list)) 
   { 
     struct thread *t = list_entry(e, struct thread, elem); 
@@ -771,14 +736,12 @@ void thread_wakeup(int64_t ticks)
     thread_unblock (t); 
     t->wakeup_time = INT64_MAX; 
   }
-  //intr_set_level (old_level);
+  intr_set_level (old_level);
 }
 
 
 
-/*Compare wakeup time of two threads.
-Author:Taekang Eom
-Time:09/06 17:47*/
+/*Compare wakeup time of two threads.*/
 static bool compare_wakeup_time (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED)
@@ -791,13 +754,10 @@ static bool compare_wakeup_time (const struct list_elem *a,
     return false;
 }
 
-/*Compare priority of two threads.
-Author:Taekang Eom
-Time:09/06 17:47
-Fixed at 09/08 18:49*/
+/*Compare priority of two threads and return true if former one is less.*/
 bool compare_priority (const struct list_elem *a,
                              const struct list_elem *b,
-                             void *aux UNUSED)//fixed at 09/08 18:49(delete static)
+                             void *aux UNUSED)
 {
   struct thread *t = list_entry(a, struct thread, elem);
   struct thread *s = list_entry(b, struct thread, elem);
@@ -807,9 +767,7 @@ bool compare_priority (const struct list_elem *a,
     return false;
 }
 
-/*Compare max priority of two locks.
-Author:Taekang Eom
-Time:09/09 16:41*/
+/*Compare max priority of two locks.*/
 bool compare_lock_priority (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED)
@@ -822,9 +780,7 @@ bool compare_lock_priority (const struct list_elem *a,
     return false;
 }
 
-/*If current thread hasn't max priority, yield cpu to max priority thread.
-Author:Taekang Eom
-Time:09/06 20:25*/
+/*If current thread hasn't max priority, yield cpu to max priority thread.*/
 void test_max_priority()
 {
   struct list_elem *e = list_max (&ready_list, compare_priority, 0);
@@ -843,4 +799,3 @@ uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
 
 
-//pintos -v -k -T 480 --qemu  -- -q -mlfqs run mlfqs-recent-1

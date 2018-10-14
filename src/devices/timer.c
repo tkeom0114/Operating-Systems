@@ -169,16 +169,15 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Timer interrupt handler. 
-Fixed by Taekang Eom
-Time:09/07 14:39*/
+/* Timer interrupt handler. Wake up blocked thread and
+calculate prioiry in advanced scheduler.*/
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   enum intr_level old_level = intr_disable ();//added at 10/10 19:52
   ticks++;
-  thread_wakeup(ticks);//added at 09/06 19:36
-  if (thread_mlfqs)//added at 09/07 14:39
+  thread_wakeup(ticks);//find threads should wakeup
+  if (thread_mlfqs)//calculate priority in advanced scheduler
   { 
     thread_mlfqs_increase_recent_cpu ();
     if (ticks % TIMER_FREQ == 0)
@@ -190,7 +189,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
       thread_mlfqs_calculate_priority (thread_current ());
     }
   }
-  intr_set_level (old_level);//added at 10/10 19:52
+  intr_set_level (old_level);
   thread_tick ();
 }
 
@@ -265,4 +264,3 @@ real_time_delay (int64_t num, int32_t denom)
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
 }
 
-//pintos -v -k -T 480 --qemu  -- -q -mlfqs run mlfqs-load-avg

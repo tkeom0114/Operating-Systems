@@ -1,5 +1,3 @@
-/*Author:Taekang Eom
-Time:09/06 21:04*/
 #ifndef __THREAD_FIXED_POINT_H
 #define __THREAD_FIXED_POINT_H
 typedef int fixed_t;

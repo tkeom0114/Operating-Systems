@@ -56,9 +56,7 @@ sema_init (struct semaphore *sema, unsigned value)
    This function may sleep, so it must not be called within an
    interrupt handler.  This function may be called with
    interrupts disabled, but if it sleeps then the next scheduled
-   thread will probably turn interrupts back on. 
-Fixed by Taekang Eom
-Time:09/08 18:52*/
+   thread will probably turn interrupts back on. */
 void
 sema_down (struct semaphore *sema) 
 {
@@ -70,7 +68,7 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_push_back (&sema->waiters, &thread_current ()->elem);//fixed at 09/09 20:32
+      list_push_back (&sema->waiters, &thread_current ()->elem);
       thread_block ();
     }
   sema->value--;
@@ -106,9 +104,7 @@ sema_try_down (struct semaphore *sema)
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
-   This function may be called from an interrupt handler. 
-Fixed by Taekang Eom
-Time:09/09 20:35*/
+   This function may be called from an interrupt handler. */
 void
 sema_up (struct semaphore *sema) 
 {
@@ -117,7 +113,7 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) //fixed at 09/09 20:35
+  if (!list_empty (&sema->waiters)) //fixed to wake up thread consider priority
   {
     struct list_elem *e = list_max (&sema->waiters, compare_priority, 0);
     struct thread *t = list_entry(e, struct thread, elem);
@@ -125,7 +121,7 @@ sema_up (struct semaphore *sema)
     thread_unblock (t);
   }
   sema->value++;
-  test_max_priority ();//added at 09/08 10:17
+  test_max_priority ();//test and preempt current thread
   intr_set_level (old_level);
 }
 
@@ -197,9 +193,7 @@ lock_init (struct lock *lock)
    This function may sleep, so it must not be called within an
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
-   we need to sleep. 
-Fixed by Taekang Eom
-Time: 09/09 12:25*/
+   we need to sleep. */
 void
 lock_acquire (struct lock *lock)
 {
@@ -210,14 +204,14 @@ lock_acquire (struct lock *lock)
   
 
   enum intr_level old_level = intr_disable ();
-  if (!thread_mlfqs && (lock->holder != NULL)) //added at 09/09 12:25(priority donation)
+  if (!thread_mlfqs && (lock->holder != NULL)) //priority donation
   {
-    thread_current ()->waiting_lock = lock;//moved at 09/09 16:47
+    thread_current ()->waiting_lock = lock;
     struct thread *t = thread_current ();
     struct lock *cur_lock = t->waiting_lock;
     while(cur_lock != NULL)
     {  
-      if (t->priority > cur_lock->lock_priority)//fixed at 09/09 17:23
+      if (t->priority > cur_lock->lock_priority)//nested donation
         {
           cur_lock->lock_priority = t->priority;
           thread_update_priority_donation (cur_lock->holder);
@@ -233,7 +227,7 @@ lock_acquire (struct lock *lock)
   if (!thread_mlfqs)
   { 
     struct thread *t = thread_current ();
-    t->waiting_lock = NULL;  //added at 09/09 12:25
+    t->waiting_lock = NULL; 
     if(list_empty(&lock->semaphore.waiters))
       lock->lock_priority = 0;
     else
@@ -310,9 +304,7 @@ struct semaphore_elem
     struct semaphore semaphore;         /* This semaphore. */
   };
 
-/*Compare maximum priority in semaphore.
-Author:Taekang Eom
-Time:09/08 19:17*/
+/*Compare maximum priority in semaphore. */
 static bool compare_sema_priority (const struct list_elem *a,
                              const struct list_elem *b,
                              void *aux UNUSED)
@@ -383,10 +375,7 @@ cond_wait (struct condition *cond, struct lock *lock)
 
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to signal a condition variable within an
-   interrupt handler.
-Fixed by Taekang Eom(fixed it because when semaphore_elem pushed, 
-it has no threads in semaphore, so didn't use compare_sema_priority in cond_wait
-Time:09/08 19:55*/
+   interrupt handler. */
 void
 cond_signal (struct condition *cond, struct lock *lock UNUSED) 
 {
@@ -395,7 +384,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) //fixed at 09/08 19:55
+  if (!list_empty (&cond->waiters)) //fixed it signaling by considering priority
   {
     struct list_elem *e = list_max (&cond->waiters, compare_sema_priority, 0);
     struct semaphore_elem *a = list_entry (e, struct semaphore_elem, elem);
