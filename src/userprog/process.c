@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -17,10 +18,12 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/args-many -a args-many -- -q  -f run 'args-many a b c'
+struct thread *get_child_thread (tid_t child_tid);
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/args-multiple -a args-multiple -- -q  -f run 'args-multiple some arguments for you!'
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -47,8 +50,11 @@ process_execute (const char *file_name)
   strlcpy (real_file_name, file_name, PGSIZE);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (strtok_r(real_file_name," ",&save_ptr), PRI_DEFAULT, start_process, fn_copy);//fixed at 10/07 11:32
+  
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
+  //waiting child prcess until loaded. added at 10/29 17:08
+  sema_down(&get_child_thread (tid)->sema_load);
   return tid;
 }
 
@@ -69,12 +75,18 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
+  /* If load failed, quit.
+  Fixed at 10/30 10:09 */
   palloc_free_page (file_name);
   if (!success) 
-    thread_exit ();
+  {
+    //sema_up(&thread_current ()->sema_load);
+    sys_exit(-1);
+    //thread_exit ();
+  }
+    
 
-  hex_dump(if_.esp,if_.esp,PHYS_BASE-if_.esp,true);
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -85,6 +97,24 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
+/*Return pointer of thread which tid is child_tid
+Author: Taekang Eom
+Time: 10/29 19:05*/
+struct thread *
+get_child_thread (tid_t child_tid)
+{
+  struct thread *t = thread_current ();
+  for (struct list_elem *e = list_begin (&t->child_list); e != list_end (&t->child_list);
+       e = list_next (e))
+  {
+    struct thread *cur = list_entry (e,struct thread,child_elem);
+    if(cur->tid == child_tid)
+      return cur;
+  }
+  return NULL;
+}
+
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/args-multiple -a args-multiple -- -q  -f run 'args-multiple some arguments for you!'
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
@@ -94,23 +124,56 @@ start_process (void *file_name_)
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing.
-   I made infinite loop in temporary.
    Fixed by Taekang Eom
    Time: 09/27 21:53 */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  while(1)//set infinite loop temporary
-  {;}
-  return -1;
+  struct thread *t = get_child_thread (child_tid);
+  if (t == NULL || t->parent != thread_current() || t->wait_called)
+  {  
+    return -1;
+  }
+  
+  t->wait_called = true;
+  if(t->is_exit)
+  { 
+    return t->exit_status;
+  }
+  sema_down (&t->sema_wait);
+  int status = t->exit_status;
+  list_remove (&t->child_elem);
+  sema_up (&t->sema_remove);
+  return status;
 }
-
 /* Free the current process's resources. */
 void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  //erase all childs and wake up parent added at 10/29 22:51
+  struct list_elem *e = list_begin (&cur->child_list);
+  //added at 10/31 15:11
+  for (int i = 2;i<cur->next_fd;i++)
+  {
+    if(cur->file_table[i] != NULL)
+      sys_close (i);
+  }
+  while(e != list_end(&cur->child_list))
+  {
+    struct list_elem *next = list_next (e);
+    struct thread *t = list_entry (e,struct thread, child_elem);
+    list_remove (e);
+    free (t);
+    e = next;
+  }
+  sema_up (&cur->sema_wait);
+  if(cur->parent != NULL)
+  {
+    sema_down (&cur->sema_remove);//여기에서 child process의 실행이 끊김
+  }
+  cur->is_exit = true;
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -220,7 +283,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. 
    Fixed by Taekang Eom
-   Time: 10/07 17:11*/
+   Time: 10/29 17:24*/
 bool
 load (const char *file_name, void (**eip) (void), void **esp) 
 {
@@ -334,6 +397,8 @@ load (const char *file_name, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  //wakeup parent process when child process end loading(whether load is successful or not). added at 10/29 17:18
+  sema_up(&thread_current ()->sema_load);
   return success;
 }
 

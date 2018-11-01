@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/fixed_point.h"//added at 09/06 21:46
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -103,6 +104,18 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct thread *parent;                /*Parent process.  added at 10/10 22:31 */
+    struct list child_list;                /*List of chiled processes.  added at 10/10 22:31 */       
+    struct list_elem child_elem;          /*list element for child list.  added at 10/10 22:31 */ 
+    struct semaphore sema_load;           /*semaphre for wait child process loaded. added at 10/29 17:02 */
+    struct semaphore sema_wait;           /*semaphre for wait child process exit. added at 10/29 17:02 */
+    struct semaphore sema_remove;           /*semaphre for wait parent process remove child. added at 10/29 17:02 */
+    int exit_status;                    /*flag of exit stutus of this thread. added at 10/29 19:07*/
+    bool wait_called;                   /*flag of wait(pid) is already called. added at 10/29 22:55*/
+    bool is_exit;                        /*flag of exit whether it is already exit. added at 10/31 15:15*/
+    struct file **file_table;             /*table of all opening files. added at 10/30 11:14*/
+    int next_fd;                         /*file descriptor of which will be created. 10/30 11:22*/
+
 #endif
 
     /* Owned by thread.c. */

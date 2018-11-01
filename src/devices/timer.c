@@ -175,6 +175,7 @@ Time:09/07 14:39*/
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
+  enum intr_level old_level = intr_disable ();//added at 10/10 19:52
   ticks++;
   thread_wakeup(ticks);//added at 09/06 19:36
   if (thread_mlfqs)//added at 09/07 14:39
@@ -189,6 +190,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
       thread_mlfqs_calculate_priority (thread_current ());
     }
   }
+  intr_set_level (old_level);//added at 10/10 19:52
   thread_tick ();
 }
 

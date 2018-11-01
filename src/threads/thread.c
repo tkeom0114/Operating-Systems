@@ -13,7 +13,9 @@
 #include "threads/vaddr.h"
 #include "threads/fixed_point.h"//added at 09/07 09:39
 #ifdef USERPROG
+#include "filesys/file.h"
 #include "userprog/process.h"
+#include "threads/malloc.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -108,6 +110,9 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  #ifdef USERPROG
+    list_init(&thread_current ()->child_list);
+  #endif
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -211,9 +216,26 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+
+
+
   /* Add to run queue and test priority with current thread
    and preempt if not advanced scheduler. */
   thread_unblock (t);
+      //initialize added data structures in thread. added at 10/29 17:08
+#ifdef USERPROG
+  sema_init (&t->sema_load,0);
+  sema_init (&t->sema_wait,0);
+  sema_init (&t->sema_remove,0);
+  list_init (&t->child_list);
+  list_push_back(&thread_current ()->child_list,&t->child_elem);
+  t->parent = thread_current ();
+  t->exit_status = 0;
+  t->wait_called = false;
+  t->is_exit = false;
+  t->file_table = calloc (128, sizeof (struct file*));
+  t->next_fd = 2;
+#endif
   if(!thread_mlfqs)//fixed at 09/13 13:37
     test_max_priority ();
   return tid;
@@ -296,7 +318,6 @@ void
 thread_exit (void) 
 {
   ASSERT (!intr_context ());
-
 #ifdef USERPROG
   process_exit ();
 #endif
@@ -304,6 +325,7 @@ thread_exit (void)
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
+  
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
@@ -607,6 +629,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->nice = 0;                   //added at 09/07 10:29
   t->recent_cpu = FIXED(0);      //added at 09/07 10:29
   list_init (&t->lock_list);     //added at 09/09 16:27
+#ifdef USERPROG
+  uint32_t *pagedir;                  /* Page directory. */
+#endif
 
 
   old_level = intr_disable ();
@@ -694,7 +719,10 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
     {
       ASSERT (prev != cur);
+      //fixed at 10/30 11:56
+      #ifndef USERPROG
       palloc_free_page (prev);
+      #endif      
     }
 }
 
@@ -715,7 +743,6 @@ schedule (void)
   ASSERT (intr_get_level () == INTR_OFF);
   ASSERT (cur->status != THREAD_RUNNING);
   ASSERT (is_thread (next));
-
   if (cur != next)
     prev = switch_threads (cur, next);
   thread_schedule_tail (prev);
