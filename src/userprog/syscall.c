@@ -15,7 +15,8 @@
 
 static void syscall_handler (struct intr_frame *);
 struct lock file_lock;//added at 10/10 16:20
-
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/sc-boundary-3 -a sc-boundary-3 -- -q  -f run sc-boundary-3
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/read-normal -a read-normal -p ../../tests/userprog/sample.txt -a sample.txt -- -q  -f run read-normal
 void
 syscall_init (void) 
 {
@@ -81,6 +82,7 @@ Made by Taekang Eom
 Time: 10/10 23:01 */
 pid_t sys_exec (const *file)
 {
+  check_adress (file);
   lock_acquire (&file_lock);
   tid_t tid = process_execute (file);
   lock_release (&file_lock);
@@ -100,6 +102,7 @@ Mate by Taekang Eom
 Time: 10/10 15:45 */
 bool sys_create (const char *file , unsigned initial_size)
 {
+  check_adress (file);
   if (file == NULL)
     sys_exit(-1);
   lock_acquire (&file_lock);
@@ -113,6 +116,7 @@ Mate by Taekang Eom
 Time: 10/10 15:45 */
 bool sys_remove (const char *file)
 {
+  check_adress (file);
   if (file == NULL)
     sys_exit(-1);
   lock_acquire (&file_lock);
@@ -127,6 +131,7 @@ Made by Taekang Eom
 Time: 10/31 14:31*/
 int sys_open (const char *file)
 {
+  check_adress (file);
   lock_acquire (&file_lock);
   int fd;
   struct thread *cur = thread_current ();
@@ -143,11 +148,29 @@ int sys_open (const char *file)
   return fd;
 }
 
+/* Returns the size of FILE in bytes.
+Made by Taekang Eom
+Time: 11/02 04:49 */
+int sys_filesize (int fd) 
+{
+  int return_size;
+  lock_acquire (&file_lock);
+  struct file *size_file = get_file (fd);
+  if (size_file == NULL)
+    return_size = -1;
+  else
+    return_size = file_length (size_file);
+  lock_release (&file_lock);
+  return return_size;
+}
+
 /*Read from open file to buffer
 Made by Taekang Eom
 Time: 10/29 23:17*/
 int sys_read (int fd, void *buffer, unsigned size)
 {
+  check_adress (buffer);
+  check_adress (buffer+size);
   lock_acquire (&file_lock);
   int return_size;
   if (fd == 0)
@@ -171,6 +194,8 @@ Made by Taekang Eom
 Time: 10/29 23:17*/
 int sys_write (int fd, void *buffer, unsigned size)
 {
+  check_adress (buffer);
+  check_adress (buffer+size);
   lock_acquire (&file_lock);
   int return_size;
   if (fd == 1)
@@ -285,6 +310,7 @@ syscall_handler (struct intr_frame *f)
       break;             
     case SYS_FILESIZE:
       save_argument (f->esp,arg,1);
+      f->eax = sys_filesize (arg[0]);
       break;         
     case SYS_READ:
       save_argument (f->esp,arg,3);

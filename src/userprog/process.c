@@ -23,7 +23,7 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 struct thread *get_child_thread (tid_t child_tid);
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/args-multiple -a args-multiple -- -q  -f run 'args-multiple some arguments for you!'
+
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -80,9 +80,9 @@ start_process (void *file_name_)
   palloc_free_page (file_name);
   if (!success) 
   {
-    //sema_up(&thread_current ()->sema_load);
-    sys_exit(-1);
-    //thread_exit ();
+    sema_up(&thread_current ()->sema_load);
+    //sys_exit(-1);
+    thread_exit ();
   }
     
 
@@ -114,7 +114,6 @@ get_child_thread (tid_t child_tid)
   return NULL;
 }
 
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/args-multiple -a args-multiple -- -q  -f run 'args-multiple some arguments for you!'
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
