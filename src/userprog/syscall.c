@@ -15,8 +15,8 @@
 
 static void syscall_handler (struct intr_frame *);
 struct lock file_lock;//added at 10/10 16:20
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/sc-boundary-3 -a sc-boundary-3 -- -q  -f run sc-boundary-3
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/read-normal -a read-normal -p ../../tests/userprog/sample.txt -a sample.txt -- -q  -f run read-normal
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/write-bad-ptr -a write-bad-ptr -p ../../tests/userprog/sample.txt -a sample.txt -- -q  -f run write-bad-ptr
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/exec-missing -a exec-missing -- -q  -f run exec-missing
 void
 syscall_init (void) 
 {
@@ -82,7 +82,6 @@ Made by Taekang Eom
 Time: 10/10 23:01 */
 pid_t sys_exec (const *file)
 {
-  check_adress (file);
   lock_acquire (&file_lock);
   tid_t tid = process_execute (file);
   lock_release (&file_lock);
@@ -102,9 +101,8 @@ Mate by Taekang Eom
 Time: 10/10 15:45 */
 bool sys_create (const char *file , unsigned initial_size)
 {
-  check_adress (file);
   if (file == NULL)
-    sys_exit(-1);
+    sys_exit (-1);
   lock_acquire (&file_lock);
   bool success = filesys_create (file,initial_size);
   lock_release (&file_lock);
@@ -116,9 +114,8 @@ Mate by Taekang Eom
 Time: 10/10 15:45 */
 bool sys_remove (const char *file)
 {
-  check_adress (file);
   if (file == NULL)
-    sys_exit(-1);
+    sys_exit (-1);
   lock_acquire (&file_lock);
   bool success;
   success = filesys_remove (file);
@@ -131,7 +128,8 @@ Made by Taekang Eom
 Time: 10/31 14:31*/
 int sys_open (const char *file)
 {
-  check_adress (file);
+  if(file == NULL)
+    sys_exit (-1);
   lock_acquire (&file_lock);
   int fd;
   struct thread *cur = thread_current ();
@@ -214,7 +212,7 @@ int sys_write (int fd, void *buffer, unsigned size)
       return_size = file_write (writing_file,buffer,size);
   }
   lock_release (&file_lock);
-  return size;
+  return return_size;
 }
 
 /*close file

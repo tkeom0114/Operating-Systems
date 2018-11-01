@@ -19,11 +19,10 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
-
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/exec-missing -a exec-missing -- -q  -f run exec-missing
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 struct thread *get_child_thread (tid_t child_tid);
-
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
@@ -55,6 +54,10 @@ process_execute (const char *file_name)
     palloc_free_page (fn_copy); 
   //waiting child prcess until loaded. added at 10/29 17:08
   sema_down(&get_child_thread (tid)->sema_load);
+  struct thread *t = get_child_thread (tid);
+  //if child process load fail, return -1. added at 11/02 06:55
+  if(t->exit_status == -1)
+    tid = -1;
   return tid;
 }
 
@@ -65,6 +68,7 @@ start_process (void *file_name_)
 {
   char *file_name = file_name_;
   char *save_ptr;
+  char *real_file_name;
   struct intr_frame if_;
   bool success;
 
@@ -74,17 +78,20 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-
   /* If load failed, quit.
   Fixed at 10/30 10:09 */
-  palloc_free_page (file_name);
   if (!success) 
   {
+    palloc_free_page (file_name);
     sema_up(&thread_current ()->sema_load);
-    //sys_exit(-1);
-    thread_exit ();
+    sys_exit(-1);
+    //thread_exit ();
   }
-    
+  //deny write execute file. added at 11/02 05:11
+  real_file_name = strtok_r(file_name," ",&save_ptr);
+  thread_current ()->execute_file = filesys_open(real_file_name);
+  file_deny_write (thread_current ()->execute_file);
+  palloc_free_page (file_name);
 
 
   /* Start the user process by simulating a return from an
@@ -159,6 +166,13 @@ process_exit (void)
     if(cur->file_table[i] != NULL)
       sys_close (i);
   }
+  //added at 11/02 05:12
+  if(cur->execute_file != NULL)
+  {
+    file_allow_write (cur->execute_file);
+    file_close (cur->execute_file);
+  }
+    
   while(e != list_end(&cur->child_list))
   {
     struct list_elem *next = list_next (e);

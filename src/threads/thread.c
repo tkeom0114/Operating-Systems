@@ -235,6 +235,7 @@ thread_create (const char *name, int priority,
   t->is_exit = false;
   t->file_table = calloc (128, sizeof (struct file*));
   t->next_fd = 2;
+  t->execute_file = NULL;
 #endif
   if(!thread_mlfqs)//fixed at 09/13 13:37
     test_max_priority ();
