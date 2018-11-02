@@ -19,7 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/exec-missing -a exec-missing -- -q  -f run exec-missing
+//pintos -v -k -T 360 --qemu  --filesys-size=2 -p tests/userprog/no-vm/multi-oom -a multi-oom -- -q  -f run multi-oom
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 struct thread *get_child_thread (tid_t child_tid);
@@ -170,26 +170,29 @@ process_exit (void)
       file_close(get_file (i));
     }
   }
-  
+  free (cur->file_table);
   //added at 11/02 05:12
   if(cur->execute_file != NULL)
   {
     file_allow_write (cur->execute_file);
     file_close (cur->execute_file);
   }
-    
+  //kill all child processes
   while(e != list_end(&cur->child_list))
   {
     struct list_elem *next = list_next (e);
     struct thread *t = list_entry (e,struct thread, child_elem);
     list_remove (e);
-    free (t);
+    list_remove (&t->elem);
+    list_remove (&t->allelem);
+    free (t->file_table);
+    palloc_free_page (t);
     e = next;
   }
   sema_up (&cur->sema_wait);
   if(cur->parent != NULL)
   {
-    sema_down (&cur->sema_remove);//여기에서 child process의 실행이 끊김
+    sema_down (&cur->sema_remove);
   }
   cur->is_exit = true;
 
