@@ -56,8 +56,8 @@ process_execute (const char *file_name)
   sema_down(&get_child_thread (tid)->sema_load);
   struct thread *t = get_child_thread (tid);
   //if child process load fail, return -1. added at 11/02 06:55
-  if(t->exit_status == -1)
-    tid = -1;
+  if(t->exit_status == TID_ERROR)
+    tid = TID_ERROR;
   return tid;
 }
 
@@ -160,12 +160,17 @@ process_exit (void)
   uint32_t *pd;
   //erase all childs and wake up parent added at 10/29 22:51
   struct list_elem *e = list_begin (&cur->child_list);
-  //added at 10/31 15:11
+  
+  //fixed at 11/02 15:18
+  
   for (int i = 2;i<cur->next_fd;i++)
   {
     if(cur->file_table[i] != NULL)
-      sys_close (i);
+    {
+      file_close(get_file (i));
+    }
   }
+  
   //added at 11/02 05:12
   if(cur->execute_file != NULL)
   {

@@ -17,6 +17,7 @@ static void syscall_handler (struct intr_frame *);
 struct lock file_lock;//added at 10/10 16:20
 //pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/write-bad-ptr -a write-bad-ptr -p ../../tests/userprog/sample.txt -a sample.txt -- -q  -f run write-bad-ptr
 //pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/exec-missing -a exec-missing -- -q  -f run exec-missing
+//pintos -v -k -T 360 --qemu  --filesys-size=2 -p tests/userprog/no-vm/multi-oom -a multi-oom -- -q  -f run multi-oom
 void
 syscall_init (void) 
 {
@@ -48,7 +49,7 @@ void save_argument (void *esp,int *arg,int count)
   }
 }
 
-/*Shutdown pintos.
+/*Find file which file desciptor is fd.
 Made by Taekang Eom
 Time: 10/30 16:42 */
 struct file *get_file (int fd)
@@ -74,6 +75,7 @@ void sys_exit (int status)
   struct thread *t = thread_current ();
   t->exit_status = status;
   printf("%s: exit(%d)\n",t->name,status);
+  //while (true) {;}//debugging
   thread_exit ();
 }
 
