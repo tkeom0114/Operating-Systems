@@ -112,6 +112,7 @@ struct thread
     struct semaphore sema_wait;           /*semaphre for wait child process exit. added at 10/29 17:02 */
     struct semaphore sema_remove;           /*semaphre for wait parent process remove child. added at 10/29 17:02 */
     int exit_status;                    /*flag of exit stutus of this thread. added at 10/29 19:07*/
+    bool load_success;                   /*flag of load of process is success. added at 11/12 21:44*/
     bool wait_called;                   /*flag of wait(pid) is already called. added at 10/29 22:55*/
     bool is_exit;                        /*flag of exit whether it is already exit. added at 10/31 15:15*/
     struct file **file_table;             /*table of all opening files. added at 10/30 11:14*/

@@ -231,6 +231,7 @@ thread_create (const char *name, int priority,
   list_push_back(&thread_current ()->child_list,&t->child_elem);
   t->parent = thread_current ();
   t->exit_status = 0;
+  t->load_success = false;
   t->wait_called = false;
   t->is_exit = false;
   t->file_table = calloc (128, sizeof (struct file*));
@@ -720,10 +721,7 @@ thread_schedule_tail (struct thread *prev)
   if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
     {
       ASSERT (prev != cur);
-      //fixed at 10/30 11:56
-      #ifndef USERPROG
-      palloc_free_page (prev);
-      #endif      
+      palloc_free_page (prev);   
     }
 }
 

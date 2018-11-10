@@ -49,15 +49,15 @@ process_execute (const char *file_name)
   strlcpy (real_file_name, file_name, PGSIZE);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (strtok_r(real_file_name," ",&save_ptr), PRI_DEFAULT, start_process, fn_copy);//fixed at 10/07 11:32
-  
+  free (real_file_name);//added at 11/09 22:47
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
-  //waiting child prcess until loaded. added at 10/29 17:08
-  sema_down(&get_child_thread (tid)->sema_load);
   struct thread *t = get_child_thread (tid);
-  //if child process load fail, return -1. added at 11/02 06:55
-  if(t->exit_status == TID_ERROR)
-    tid = TID_ERROR;
+  //waiting child prcess until loaded. added at 10/29 17:08
+  sema_down(&t->sema_load);
+  //if child process load fail, call wait. added at 11/02 06:55  
+  if (t->load_success == false) 
+    return process_wait (tid);
   return tid;
 }
 
@@ -78,6 +78,7 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  thread_current ()->load_success = success;//added at 11/12 21:46
   /* If load failed, quit.
   Fixed at 10/30 10:09 */
   if (!success) 
@@ -85,7 +86,6 @@ start_process (void *file_name_)
     palloc_free_page (file_name);
     sema_up(&thread_current ()->sema_load);
     sys_exit(-1);
-    //thread_exit ();
   }
   //deny write execute file. added at 11/02 05:11
   real_file_name = strtok_r(file_name," ",&save_ptr);
@@ -148,7 +148,8 @@ process_wait (tid_t child_tid)
   }
   sema_down (&t->sema_wait);
   int status = t->exit_status;
-  list_remove (&t->child_elem);
+  if(&t->child_elem != NULL && t->child_elem.prev != NULL && t->child_elem.next != NULL)
+    list_remove (&t->child_elem);
   sema_up (&t->sema_remove);
   return status;
 }
@@ -182,10 +183,25 @@ process_exit (void)
   {
     struct list_elem *next = list_next (e);
     struct thread *t = list_entry (e,struct thread, child_elem);
+    if (file_lock.holder == t)
+    {
+      file_lock.holder = NULL;
+      file_lock.semaphore.value = 1;
+    }
     list_remove (e);
-    list_remove (&t->elem);
-    list_remove (&t->allelem);
-    free (t->file_table);
+    if(&t->elem != NULL && t->elem.prev != NULL && t->elem.next != NULL)
+      list_remove (&t->elem);
+    if(&t->allelem != NULL && t->allelem.prev != NULL && t->allelem.next != NULL)
+      list_remove (&t->allelem);
+    for (int i = 2;i<t->next_fd;i++)
+    {
+     if(t->file_table[i] != NULL)
+      {
+        file_close(get_file (i));
+      }
+    }
+    if(t->file_table != NULL);
+      free (t->file_table);
     palloc_free_page (t);
     e = next;
   }
@@ -568,7 +584,7 @@ setup_stack (void **esp, char *file_name)
     strlcpy (fn_copy_2, file_name, PGSIZE);
     for (token = strtok_r(fn_copy_1," ",&save_ptr_1);token != NULL;token = strtok_r(NULL," ",&save_ptr_1))
       argc++;
-    free(fn_copy_1);
+    free (fn_copy_1);
     parsed_tokens = calloc (argc,sizeof(char*));
     for (token = strtok_r(fn_copy_2," ",&save_ptr_2);token != NULL;token = strtok_r(NULL," ",&save_ptr_2))
     {
@@ -576,7 +592,7 @@ setup_stack (void **esp, char *file_name)
       strlcpy (parsed_tokens[i], token, strlen (token) + 1);
       i++;
     }
-    free(fn_copy_2);
+    free (fn_copy_2);
     argv = malloc ((argc + 1) * sizeof(char*));
     argv[argc] = NULL;
     for(i = argc - 1;i >= 0; i--)
@@ -605,9 +621,12 @@ setup_stack (void **esp, char *file_name)
     *esp -= sizeof(void*);
     memcpy(*esp,&argv[argc],sizeof(void*));
   }
-  
+  /*
+  for(i=0;i<argc;i++)//added at 11/09 22:50
+    free (parsed_tokens[i]);
+  free (argv);
   //added
-  
+  *///debugging
   return success;
 }
 

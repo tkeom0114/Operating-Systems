@@ -75,7 +75,6 @@ void sys_exit (int status)
   struct thread *t = thread_current ();
   t->exit_status = status;
   printf("%s: exit(%d)\n",t->name,status);
-  //while (true) {;}//debugging
   thread_exit ();
 }
 
@@ -84,9 +83,9 @@ Made by Taekang Eom
 Time: 10/10 23:01 */
 pid_t sys_exec (const *file)
 {
-  lock_acquire (&file_lock);
+  lock_acquire (&file_lock);//debugging
   tid_t tid = process_execute (file);
-  lock_release (&file_lock);
+  lock_release (&file_lock);//debugging
   return tid;
 }
 
