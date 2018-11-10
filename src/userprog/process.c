@@ -621,12 +621,11 @@ setup_stack (void **esp, char *file_name)
     *esp -= sizeof(void*);
     memcpy(*esp,&argv[argc],sizeof(void*));
   }
-  /*
+  
   for(i=0;i<argc;i++)//added at 11/09 22:50
     free (parsed_tokens[i]);
   free (argv);
   //added
-  *///debugging
   return success;
 }
 

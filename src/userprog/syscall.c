@@ -83,9 +83,9 @@ Made by Taekang Eom
 Time: 10/10 23:01 */
 pid_t sys_exec (const *file)
 {
-  lock_acquire (&file_lock);//debugging
+  lock_acquire (&file_lock);
   tid_t tid = process_execute (file);
-  lock_release (&file_lock);//debugging
+  lock_release (&file_lock);
   return tid;
 }
 
