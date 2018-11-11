@@ -19,7 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
-//pintos -v -k -T 360 --qemu  --filesys-size=2 -p tests/userprog/no-vm/multi-oom -a multi-oom -- -q  -f run multi-oom
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 struct thread *get_child_thread (tid_t child_tid);
@@ -78,7 +78,7 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-  thread_current ()->load_success = success;//added at 11/12 21:46
+  thread_current ()->load_success = success;//save whether load process is successed. added at 11/12 21:46
   /* If load failed, quit.
   Fixed at 10/30 10:09 */
   if (!success) 
@@ -172,38 +172,13 @@ process_exit (void)
     }
   }
   free (cur->file_table);
-  //added at 11/02 05:12
+  /*allow write to execute file of this process
+  and close this file
+  added at 11/02 05:12 */
   if(cur->execute_file != NULL)
   {
     file_allow_write (cur->execute_file);
     file_close (cur->execute_file);
-  }
-  //kill all child processes
-  while(e != list_end(&cur->child_list))
-  {
-    struct list_elem *next = list_next (e);
-    struct thread *t = list_entry (e,struct thread, child_elem);
-    if (file_lock.holder == t)
-    {
-      file_lock.holder = NULL;
-      file_lock.semaphore.value = 1;
-    }
-    list_remove (e);
-    if(&t->elem != NULL && t->elem.prev != NULL && t->elem.next != NULL)
-      list_remove (&t->elem);
-    if(&t->allelem != NULL && t->allelem.prev != NULL && t->allelem.next != NULL)
-      list_remove (&t->allelem);
-    for (int i = 2;i<t->next_fd;i++)
-    {
-     if(t->file_table[i] != NULL)
-      {
-        file_close(get_file (i));
-      }
-    }
-    if(t->file_table != NULL);
-      free (t->file_table);
-    palloc_free_page (t);
-    e = next;
   }
   sema_up (&cur->sema_wait);
   if(cur->parent != NULL)
@@ -334,7 +309,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   char *real_file_name = malloc(strlen(file_name)+1);
   char *save_ptr;
   strlcpy (real_file_name, file_name, PGSIZE);
-  real_file_name = strtok_r(real_file_name," ",&save_ptr);//added
+  real_file_name = strtok_r(real_file_name," ",&save_ptr);//token file name
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -575,7 +550,8 @@ setup_stack (void **esp, char *file_name)
       else
         palloc_free_page (kpage);
     }
-  //added at 10/07 17:32
+  /*Push arguments to stack
+  added at 10/07 17:32*/
   if(success)
   {
     fn_copy_1 = (char*)malloc(strlen(file_name)+1);
@@ -621,7 +597,7 @@ setup_stack (void **esp, char *file_name)
     *esp -= sizeof(void*);
     memcpy(*esp,&argv[argc],sizeof(void*));
   }
-  
+  //free memory of used strings
   for(i=0;i<argc;i++)//added at 11/09 22:50
     free (parsed_tokens[i]);
   free (argv);

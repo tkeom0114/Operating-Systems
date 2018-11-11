@@ -273,8 +273,6 @@ Time: 10/10 12:48 */
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  //printf ("system call!\n");
-  //thread_exit ();
   check_adress(f->esp);
   int arg[3];
   int syscall_num = *(int*)f->esp;
