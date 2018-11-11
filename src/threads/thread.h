@@ -4,7 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include "threads/fixed_point.h"//added at 09/06 21:46
+#include "threads/synch.h"
+#include "filesys/file.h"//added at 11/02 05:02
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -81,7 +82,6 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-
 struct thread
   {
     /* Owned by thread.c. */
@@ -90,11 +90,6 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    int base_priority;                  /* Priority of before priority donation.
-                                          added at 09/09 12:15 */
-    struct lock *waiting_lock;                    /* The lock which thread want to aquire.
-                                         added at 09/09 12:18 */
-    struct list lock_list;               //added at 09/09 16:25
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -103,15 +98,24 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct thread *parent;                /*Parent process.  added at 10/10 22:31 */
+    struct list child_list;                /*List of chiled processes.  added at 10/10 22:31 */       
+    struct list_elem child_elem;          /*list element for child list.  added at 10/10 22:31 */ 
+    struct semaphore sema_load;           /*semaphre for wait child process loaded. added at 10/29 17:02 */
+    struct semaphore sema_wait;           /*semaphre for wait child process exit. added at 10/29 17:02 */
+    struct semaphore sema_remove;           /*semaphre for wait parent process remove child. added at 10/29 17:02 */
+    int exit_status;                    /*flag of exit stutus of this thread. added at 10/29 19:07*/
+    bool load_success;                   /*flag of load of process is success. added at 11/12 21:44*/
+    bool wait_called;                   /*flag of wait(pid) is already called. added at 10/29 22:55*/
+    bool is_exit;                        /*flag of exit whether it is already exit. added at 10/31 15:15*/
+    struct file **file_table;             /*table of all opening files. added at 10/30 11:14*/
+    int next_fd;                         /*file descriptor of which will be created. 10/30 11:22*/
+    struct file *execute_file;            /*the file executed by current thread. added at 11/02 05:04*/
+
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-    
-    int64_t wakeup_time;                /*when thread should be wakeup. Added at 09/06 17:40*/
-    int nice;                           //niceness of thread, added at added at 09/06 21:49
-    fixed_t recent_cpu;                 //recent cpu, added at added at 09/06 21:48
-
   };
 
 /* If false (default), use round-robin scheduler.
@@ -138,9 +142,6 @@ const char *thread_name (void);
 void thread_exit (void) NO_RETURN;
 void thread_yield (void);
 
-void thread_sleep(int64_t ticks);//added at 09/06 19:35
-void thread_wakeup(int64_t ticks);//added at 09/06 19:35
-
 /* Performs some operation on thread t, given auxiliary data AUX. */
 typedef void thread_action_func (struct thread *t, void *aux);
 void thread_foreach (thread_action_func *, void *);
@@ -152,18 +153,5 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-void thread_mlfqs_increase_recent_cpu (void);//added at 09/07 14:36
-void thread_mlfqs_calculate_priority (struct thread *t);//added at 09/07 14:22
-void thread_mlfqs_calculate_recent_cpu (struct thread *t);//added at 09/07 14:22
-void mlfqs_calculate_load_avg (void);//added at 09/07 14:22
-void thread_mlfqs_calculate_every_second (void);//added at 09/07 15:15
-void test_max_priority(void);//added at 09/07 14:49
-bool compare_priority (const struct list_elem *a,
-                             const struct list_elem *b,
-                             void *aux UNUSED);//added at 09/08 18:51
-bool compare_lock_priority (const struct list_elem *a,
-                             const struct list_elem *b,
-                             void *aux UNUSED);//added at 09/09 17:01
-
 
 #endif /* threads/thread.h */

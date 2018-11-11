@@ -85,18 +85,15 @@ timer_elapsed (int64_t then)
 }
 
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
-   be turned on. 
-Fixed by Taekang Eom
-Time:09/06 17:35*/
+   be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  thread_sleep (ticks);
-  //while (timer_elapsed (start) < ticks) 
-    //thread_yield ();
+  while (timer_elapsed (start) < ticks) 
+    thread_yield ();
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -169,26 +166,11 @@ timer_print_stats (void)
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
 
-/* Timer interrupt handler. 
-Fixed by Taekang Eom
-Time:09/07 14:39*/
+/* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
-  thread_wakeup(ticks);//added at 09/06 19:36
-  if (thread_mlfqs)//added at 09/07 14:39
-  { 
-    thread_mlfqs_increase_recent_cpu ();
-    if (ticks % TIMER_FREQ == 0)
-    {
-      thread_mlfqs_calculate_every_second ();
-    }
-    else if(ticks % 4 ==0)
-    {
-      thread_mlfqs_calculate_priority (thread_current ());
-    }
-  }
   thread_tick ();
 }
 
@@ -262,5 +244,3 @@ real_time_delay (int64_t num, int32_t denom)
   ASSERT (denom % 1000 == 0);
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
 }
-
-//pintos -v -k -T 480 --qemu  -- -q -mlfqs run mlfqs-load-avg
