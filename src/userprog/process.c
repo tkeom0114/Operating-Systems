@@ -68,7 +68,6 @@ start_process (void *file_name_)
 {
   char *file_name = file_name_;
   char *save_ptr;
-  char *real_file_name;
   struct intr_frame if_;
   bool success;
 
@@ -86,10 +85,7 @@ start_process (void *file_name_)
     palloc_free_page (file_name);
     sys_exit(-1);
   }
-  //deny write execute file. added at 11/02 05:11
-  real_file_name = strtok_r(file_name," ",&save_ptr);
-  thread_current ()->execute_file = filesys_open(real_file_name);
-  file_deny_write (thread_current ()->execute_file);
+
   palloc_free_page (file_name);
 
 
@@ -312,12 +308,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (real_file_name);
+  
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", real_file_name);//fixed at 10/07 17:18
       goto done; 
     }
-
+  //deny write to file if file is exist(fixed)
+  thread_current ()->execute_file = file;
+  file_deny_write (thread_current ()->execute_file);
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
       || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
@@ -401,7 +400,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  //file_close (file);
   //wakeup parent process when child process end loading(whether load is successful or not). added at 10/29 17:18
   sema_up(&thread_current ()->sema_load);
   return success;
