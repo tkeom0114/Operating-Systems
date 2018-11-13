@@ -107,7 +107,6 @@ struct thread
     int exit_status;                    /*flag of exit stutus of this thread. added at 10/29 19:07*/
     bool load_success;                   /*flag of load of process is success. added at 11/12 21:44*/
     bool wait_called;                   /*flag of wait(pid) is already called. added at 10/29 22:55*/
-    bool is_exit;                        /*flag of exit whether it is already exit. added at 10/31 15:15*/
     struct file **file_table;             /*table of all opening files. added at 10/30 11:14*/
     int next_fd;                         /*file descriptor of which will be created. 10/30 11:22*/
     struct file *execute_file;            /*the file executed by current thread. added at 11/02 05:04*/

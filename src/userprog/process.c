@@ -55,7 +55,7 @@ process_execute (const char *file_name)
   struct thread *t = get_child_thread (tid);
   //waiting child prcess until loaded. added at 10/29 17:08
   sema_down(&t->sema_load);
-  //if child process load fail, call wait. added at 11/02 06:55  
+  //if child process load fail, call wait. added at 11/02 06:55
   if (t->load_success == false) 
     return process_wait (tid);
   return tid;
@@ -84,7 +84,6 @@ start_process (void *file_name_)
   if (!success) 
   {
     palloc_free_page (file_name);
-    sema_up(&thread_current ()->sema_load);
     sys_exit(-1);
   }
   //deny write execute file. added at 11/02 05:11
@@ -136,20 +135,12 @@ int
 process_wait (tid_t child_tid) 
 {
   struct thread *t = get_child_thread (child_tid);
-  if (t == NULL || t->parent != thread_current() || t->wait_called)
-  {  
+  if (t == NULL || t->parent != thread_current() || t->wait_called) 
     return -1;
-  }
-  
   t->wait_called = true;
-  if(t->is_exit)
-  { 
-    return t->exit_status;
-  }
   sema_down (&t->sema_wait);
   int status = t->exit_status;
-  if(&t->child_elem != NULL && t->child_elem.prev != NULL && t->child_elem.next != NULL)
-    list_remove (&t->child_elem);
+  list_remove (&t->child_elem);
   sema_up (&t->sema_remove);
   return status;
 }
@@ -163,13 +154,18 @@ process_exit (void)
   struct list_elem *e = list_begin (&cur->child_list);
   
   //fixed at 11/02 15:18
-  
   for (int i = 2;i<cur->next_fd;i++)
   {
     if(cur->file_table[i] != NULL)
     {
       file_close(get_file (i));
     }
+  }
+  //wait all children to exit. added at 11/11 20:17
+  for (struct list_elem *e = list_begin (&cur->child_list);e != list_end (&cur->child_list);e = list_next (e))
+  {
+    struct thread *t = list_entry (e,struct thread,child_elem);
+    process_wait (t->tid);
   }
   free (cur->file_table);
   /*allow write to execute file of this process
@@ -182,10 +178,7 @@ process_exit (void)
   }
   sema_up (&cur->sema_wait);
   if(cur->parent != NULL)
-  {
     sema_down (&cur->sema_remove);
-  }
-  cur->is_exit = true;
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -596,12 +589,12 @@ setup_stack (void **esp, char *file_name)
     memcpy(*esp,&argc,sizeof(int));
     *esp -= sizeof(void*);
     memcpy(*esp,&argv[argc],sizeof(void*));
+    //free memory of used strings
+    for(i=0;i<argc;i++)//added at 11/09 22:50
+      free (parsed_tokens[i]);
+    free (argv);
+    //added
   }
-  //free memory of used strings
-  for(i=0;i<argc;i++)//added at 11/09 22:50
-    free (parsed_tokens[i]);
-  free (argv);
-  //added
   return success;
 }
 

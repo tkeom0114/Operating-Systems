@@ -215,7 +215,6 @@ thread_create (const char *name, int priority,
   t->exit_status = 0;
   t->load_success = false;
   t->wait_called = false;
-  t->is_exit = false;
   t->file_table = calloc (128, sizeof (struct file*));
   t->next_fd = 2;
   t->execute_file = NULL;

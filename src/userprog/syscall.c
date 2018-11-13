@@ -1,5 +1,6 @@
 #include "userprog/syscall.h"
 #include "userprog/process.h"  //added at 10/10 23:05
+#include "userprog/pagedir.h"  //added at 11/13 01:57
 #include <stdio.h>
 #include <syscall-nr.h>    
 #include "devices/input.h"
@@ -15,8 +16,6 @@
 
 static void syscall_handler (struct intr_frame *);
 
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/write-bad-ptr -a write-bad-ptr -p ../../tests/userprog/sample.txt -a sample.txt -- -q  -f run write-bad-ptr
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/exec-missing -a exec-missing -- -q  -f run exec-missing
 
 void
 syscall_init (void) 
