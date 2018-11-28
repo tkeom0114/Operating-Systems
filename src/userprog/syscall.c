@@ -2,7 +2,8 @@
 #include "userprog/process.h"  //added at 10/10 23:05
 #include "userprog/pagedir.h"  //added at 11/13 01:57
 #include <stdio.h>
-#include <syscall-nr.h>    
+#include <syscall-nr.h>   
+#include <string.h> 
 #include "devices/input.h"
 #include "lib/user/syscall.h"   //added at 10/10 23:05
 #include "lib/kernel/stdio.h"  //added at 10/29 23:21
@@ -14,6 +15,10 @@
 #include "filesys/filesys.h"   //added at 10/10 23:05
 #include "filesys/file.h"      //added at 10/30 16:24
 
+#ifdef VM
+  #include "vm/page.h"
+#endif
+
 static void syscall_handler (struct intr_frame *);
 
 
@@ -24,14 +29,33 @@ syscall_init (void)
   lock_init (&file_lock);
 }
 
-/*Checking the adress is in user space.
+/*Checking the address is in user space.
 Made by Taekang Eom
 Time: 10/10 12:33 */
-void check_adress (void *ptr)
+#ifndef VM
+void check_address (void *ptr)
 {
   if(!is_user_vaddr(ptr) || ptr < (void *)0x08048000)
+  {
     sys_exit(-1);
+  }
+    
 }
+#else
+struct page* check_address (void *ptr)//fixed at 11/28 13:02
+{
+  printf("%lx\n",ptr);//debugging
+  struct page *p = find_page(&thread_current ()->supp_page_table,ptr);
+  if(p == NULL)
+  {
+    sys_exit (-1);
+  }
+  return p;
+}
+
+
+#endif
+
 
 /*Get arguments from user stack.
 Made by Taekang Eom
@@ -43,7 +67,7 @@ void save_argument (void *esp,int *arg,int count)
   for (i=0;i<count;i++)
   {
     ptr = (int*)esp+i+1;
-    check_adress (ptr);
+    check_address (ptr);
     arg[i] = *ptr;
   }
 }
@@ -82,6 +106,8 @@ Made by Taekang Eom
 Time: 10/10 23:01 */
 pid_t sys_exec (const *file)
 {
+  check_address(file);
+  check_address(file+strlen(file));
   lock_acquire (&file_lock);
   tid_t tid = process_execute (file);
   lock_release (&file_lock);
@@ -167,8 +193,8 @@ Made by Taekang Eom
 Time: 10/29 23:17*/
 int sys_read (int fd, void *buffer, unsigned size)
 {
-  check_adress (buffer);
-  check_adress (buffer+size);
+  check_address (buffer);
+  check_address (buffer+size);
   lock_acquire (&file_lock);
   int return_size;
   if (fd == 0)
@@ -192,12 +218,13 @@ Made by Taekang Eom
 Time: 10/29 23:17*/
 int sys_write (int fd, void *buffer, unsigned size)
 {
-  check_adress (buffer);
-  check_adress (buffer+size);
+  check_address (buffer);
+  check_address (buffer+size);
   lock_acquire (&file_lock);
   int return_size;
   if (fd == 1)
   {
+    
     putbuf (buffer,size);
     return_size = size;
   }
@@ -257,14 +284,13 @@ void sys_seek (int fd, unsigned position)
 unsigned sys_tell (int fd) 
 {
   lock_acquire (&file_lock);
+  unsigned tell;
   struct file *tell_file = get_file (fd);
   if(tell_file == NULL)
-  {
-    lock_release (&file_lock);
-    return -1;
-  }
-  int tell = file_tell (tell_file);
+    tell = -1;
+  tell = file_tell (tell_file);
   lock_release (&file_lock);
+  return tell;
 }
 
 /*Fixed by Taekang Eom
@@ -272,7 +298,7 @@ Time: 10/10 12:48 */
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  check_adress(f->esp);
+  check_address(f->esp);
   int arg[3];
   int syscall_num = *(int*)f->esp;
   switch(syscall_num)

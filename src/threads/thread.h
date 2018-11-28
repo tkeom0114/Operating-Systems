@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include "threads/synch.h"
 #include "filesys/file.h"//added at 11/02 05:02
+#include <hash.h>//added at 11/27 21:19
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -113,6 +114,10 @@ struct thread
 
 #endif
 
+#ifdef VM//added at 11/27 15:33
+    struct hash supp_page_table;
+    //struct hash mmap_file_table;
+#endif
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

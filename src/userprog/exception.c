@@ -3,8 +3,16 @@
 #include <stdio.h>
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"//added at 11/02 04:18
+#include "userprog/process.h"//added at 11/27 20:55
+#include "userprog/pagedir.h"//added at 11/27 20:55
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/palloc.h"//added at 11/27 20:55
+
+#ifdef VM
+  #include "vm/page.h"
+#endif
+
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -148,6 +156,52 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+  #ifdef VM//added at 11/27 21:09
+    struct page *p = find_page (&thread_current ()->supp_page_table,fault_addr);
+    bool success = false;
+    if(p == NULL)
+    {     
+      sys_exit (-1);
+    }
+    if(p->type == ZERO_PAGE)
+    {
+      uint8_t *kpage = palloc_get_page (PAL_USER || PAL_ZERO);
+      if(kpage == NULL)
+        sys_exit (-1);
+      success = install_page (p->virtual_address,kpage,p->writable);
+      if (!success)
+      {
+        palloc_free_page (kpage);
+        sys_exit (-1);
+      }    
+      p->physical_address = kpage;
+    }
+    else if(p->type == FILE_PAGE)
+    {
+      uint8_t *kpage = palloc_get_page (PAL_USER);
+      if(kpage == NULL)
+      {
+        sys_exit (-1);
+      }
+        
+      success = install_page (p->virtual_address,kpage,p->writable);      
+      if (!success)
+      {       
+        palloc_free_page (kpage);
+        sys_exit (-1);
+      }
+      p->physical_address = kpage;
+      if (file_read_at(p->file,kpage,p->read_bytes,p->offset) != p->read_bytes)
+      {
+        sys_exit (-1);
+      }
+        
+    }
+    if(success)
+      return;
+
+  #endif
   sys_exit (-1);//added at 11/02 04:17
 
   /* To implement virtual memory, delete the rest of the function
