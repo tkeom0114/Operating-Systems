@@ -188,9 +188,7 @@ process_exit (void)
     file_allow_write (cur->execute_file);
     file_close (cur->execute_file);
   } 
-  sema_up (&cur->sema_wait);
-  if(cur->parent != NULL)
-    sema_down (&cur->sema_remove); 
+  
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -205,11 +203,11 @@ process_exit (void)
          that's been freed (and cleared). */
       cur->pagedir = NULL;
       pagedir_activate (NULL);
-      #ifndef VM
-        pagedir_destroy (pd);//debugging
-      #endif
+      pagedir_destroy (pd);
     }
-    
+  sema_up (&cur->sema_wait);
+  if(cur->parent != NULL)
+    sema_down (&cur->sema_remove); 
 }
 
 /* Sets up the CPU for running user code in the current

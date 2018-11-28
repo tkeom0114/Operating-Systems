@@ -185,7 +185,7 @@ page_fault (struct intr_frame *f)
         sys_exit (-1);
       }
         
-      success = install_page (p->virtual_address,kpage,p->writable);      
+      success = install_page (p->virtual_address,kpage,p->writable);
       if (!success)
       {       
         palloc_free_page (kpage);
@@ -196,7 +196,7 @@ page_fault (struct intr_frame *f)
       {
         sys_exit (-1);
       }
-        
+      memset (kpage + p->read_bytes, 0, p->zero_bytes); 
     }
     if(success)
       return;

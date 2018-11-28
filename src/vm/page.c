@@ -3,7 +3,6 @@
 #include "threads/malloc.h"
 
 
-
 static unsigned page_hash_func (const struct hash_elem *e, void *aux)
 {
     struct page *p = hash_entry (e,struct page,page_elem);
@@ -21,7 +20,7 @@ void page_table_init (struct hash *supp_page_table)
 }
 
 bool insert_page (struct hash *supp_page_table, struct page *p)
-{
+{   
     struct hash_elem *e = hash_insert (supp_page_table,&p->page_elem);
     return (e == NULL);
 }
@@ -47,8 +46,6 @@ struct page *find_page (struct hash *supp_page_table, void *virtual_address)
 void page_destroy_func (struct hash_elem*e, void *aux)
 {
     struct page *p = hash_entry (e,struct page,page_elem);
-    if (p->physical_address!=NULL)
-        palloc_free_page (p->physical_address);
     free (hash_entry (e,struct page,page_elem));
 }
 
