@@ -527,7 +527,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       struct page *p = malloc (sizeof (struct page)); 
       if (p == NULL)
         return false;   
-      p->type = FILE_PAGE;
+      p->type = EXE_PAGE;
       p->file = file;
       p->virtual_address = upage;
       p->physical_address = NULL;
@@ -570,7 +570,6 @@ setup_stack (void **esp, char *file_name)
   char *fn_copy_2;
   char *save_ptr_1;
   char *save_ptr_2;//added
-#ifndef VM
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
@@ -580,14 +579,14 @@ setup_stack (void **esp, char *file_name)
       else
         palloc_free_page (kpage);
     }
-#else//added at 11/27 19:46
+#ifdef VM//added at 11/27 19:46
   struct page *p = malloc (sizeof (struct page));
   if (p == NULL)
     return false;
-  p->type = ZERO_PAGE;
+  p->type = EXE_PAGE;
   p->file = NULL;
   p->virtual_address = ((uint8_t *) PHYS_BASE) - PGSIZE;
-  p->physical_address = NULL;
+  p->physical_address = kpage;
   p->writable = true;
   p->offset = 0;
   p->read_bytes = 0;
@@ -599,7 +598,6 @@ setup_stack (void **esp, char *file_name)
     return false;
   }
   success = true;
-  *esp = PHYS_BASE;
 #endif
   /*Push arguments to stack
   added at 10/07 17:32*/

@@ -12,14 +12,14 @@ Time: 11/27 15:54
 
 enum page_type
 {
-	ZERO_PAGE=0,
+	EXE_PAGE=0,
 	FILE_PAGE,
 	SWAP_PAGE
 };
 
 struct page
 {
-	uint8_t type;//page의 타입(FILE에서 로드 된 것인지, 일반적인 Binary page인지)
+	uint8_t type;//page의 타입(FILE에서 로드 된 것인지, Binary page인지)
 	void *virtual_address;//virtual page가 시작되는 위치
 	void *physical_address;//physical frame이 시작되는 위치
 	bool writable;//쓰기 가능 여부를 나타냄

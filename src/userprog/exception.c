@@ -164,26 +164,11 @@ page_fault (struct intr_frame *f)
     {     
       sys_exit (-1);
     }
-    if(p->type == ZERO_PAGE)
-    {
-      uint8_t *kpage = palloc_get_page (PAL_USER || PAL_ZERO);
-      if(kpage == NULL)
-        sys_exit (-1);
-      success = install_page (p->virtual_address,kpage,p->writable);
-      if (!success)
-      {
-        palloc_free_page (kpage);
-        sys_exit (-1);
-      }    
-      p->physical_address = kpage;
-    }
-    else if(p->type == FILE_PAGE)
+    if(p->type == EXE_PAGE)
     {
       uint8_t *kpage = palloc_get_page (PAL_USER);
       if(kpage == NULL)
-      {
         sys_exit (-1);
-      }
         
       success = install_page (p->virtual_address,kpage,p->writable);
       if (!success)
@@ -197,6 +182,10 @@ page_fault (struct intr_frame *f)
         sys_exit (-1);
       }
       memset (kpage + p->read_bytes, 0, p->zero_bytes); 
+    }
+    else if(p->type == FILE_PAGE)
+    {
+      ;
     }
     if(success)
       return;
