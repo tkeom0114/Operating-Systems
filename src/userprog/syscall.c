@@ -44,7 +44,6 @@ void check_address (void *ptr)
 #else
 struct page* check_address (void *ptr)//fixed at 11/28 13:02
 {
-  printf("%lx\n",ptr);//debugging
   struct page *p = find_page(&thread_current ()->supp_page_table,ptr);
   if(p == NULL)
   {
