@@ -20,9 +20,6 @@
 #include "threads/vaddr.h"
 #include "threads/synch.h"
 
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/exec-multiple -a exec-multiple -p tests/userprog/child-simple -a child-simple -- -q  -f run exec-multiple
-
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/exec-multiple -a exec-multiple -p tests/userprog/child-simple -a child-simple --swap-size=4 -- -q  -f run exec-multiple
 
 #ifdef VM
   #include "vm/page.h"
@@ -583,7 +580,7 @@ setup_stack (void **esp, char *file_name)
   struct page *p = malloc (sizeof (struct page));
   if (p == NULL)
     return false;
-  p->type = EXE_PAGE;
+  p->type = SWAP_PAGE;
   p->file = NULL;
   p->virtual_address = ((uint8_t *) PHYS_BASE) - PGSIZE;
   p->physical_address = kpage;
@@ -595,6 +592,7 @@ setup_stack (void **esp, char *file_name)
   if(!insert_page (&thread_current ()->supp_page_table,p))
   {
     free(p);
+    palloc_free_page (kpage);
     return false;
   }
   success = true;

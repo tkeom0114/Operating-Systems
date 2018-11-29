@@ -1,12 +1,16 @@
 #include "vm/page.h"
 #include <hash.h>
 #include "threads/malloc.h"
+#include "threads/vaddr.h"
+#include "threads/thread.h"
+#include "threads/palloc.h"
+#include <stdio.h>
 
 
 static unsigned page_hash_func (const struct hash_elem *e, void *aux)
 {
     struct page *p = hash_entry (e,struct page,page_elem);
-    return (unsigned long long)(p->virtual_address)>>12;
+    return (unsigned long long)(p->virtual_address) >> PGBITS;
 }
 
 static bool page_less_func (const struct hash_elem *a, const struct hash_elem *b, void *aux)
@@ -52,4 +56,41 @@ void page_destroy_func (struct hash_elem*e, void *aux)
 void destroy_page_table (struct hash *supp_page_table)
 {
     hash_destroy (supp_page_table,page_destroy_func);
+}
+
+//grow stack
+struct page* grow_stack (void *ptr, void *esp)
+{
+    if (ptr < esp-32 || ptr >= PHYS_BASE
+      || ptr < PHYS_BASE-0x00400000) 
+        return NULL;
+    uint8_t *kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+    void *vpage;
+    if (kpage == NULL) 
+        return NULL;
+    vpage = (void*)(((int)ptr>>PGBITS)<<PGBITS);
+    if (!install_page (vpage, kpage, true))
+    {
+        palloc_free_page (kpage);
+        return NULL;
+    }       
+    struct page *p = malloc (sizeof (struct page));
+    if (p == NULL)
+        return NULL;
+    p->type = SWAP_PAGE;
+    p->file = NULL;
+    p->virtual_address = vpage;
+    p->physical_address = kpage;
+    p->writable = true;
+    p->offset = 0;
+    p->read_bytes = 0;
+    p->zero_bytes = PGSIZE;
+    p->swap_slot = -1;
+    if(!insert_page (&thread_current ()->supp_page_table,p))
+    {
+        free(p);
+        palloc_free_page (kpage);
+        return NULL;
+    }
+    return p;
 }

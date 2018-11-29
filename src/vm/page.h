@@ -50,5 +50,5 @@ bool delete_page (struct hash *supp_page_table, struct page *p);
 struct page *find_page (struct hash *supp_page_table, void *virtual_address);
 void page_destroy_func (struct hash_elem*e, void *aux);
 void destroy_page_table (struct hash *supp_page_table);
-
+struct page* grow_stack (void *ptr, void *esp);
 #endif

@@ -33,7 +33,7 @@ syscall_init (void)
 Made by Taekang Eom
 Time: 10/10 12:33 */
 #ifndef VM
-void check_address (void *ptr)
+void check_address (void *ptr, void *esp UNUSED)
 {
   if(!is_user_vaddr(ptr) || ptr < (void *)0x08048000)
   {
@@ -42,16 +42,61 @@ void check_address (void *ptr)
     
 }
 #else
-struct page* check_address (void *ptr)//fixed at 11/28 13:02
+/*Checking the address is in user space.
+Made by Taekang Eom
+Time: 11/29 20:34 */
+struct page* check_address (void *ptr, void *esp)//fixed at 11/28 13:02
 {
   struct page *p = find_page(&thread_current ()->supp_page_table,ptr);
   if(p == NULL)
   {
-    sys_exit (-1);
+    p = grow_stack (ptr,esp);
+    if (p == NULL)
+      sys_exit (-1);
   }
   return p;
 }
 
+/*Checking the address of buffer.
+Made by Taekang Eom
+Time: 11/29 20:34 */
+void check_buffer(void* buffer, unsigned size, void* esp, bool to_write)
+{
+  unsigned cur_buffer = (unsigned) buffer;
+  int cur_size = (int)size;
+  struct page *p;
+  while (cur_size > 0)
+  {
+    p = check_address ((void*)cur_buffer,esp);
+    
+    if (!p->writable && to_write)
+      sys_exit (-1);  
+    cur_buffer += PGSIZE;
+    cur_size -= PGSIZE;
+  }
+  p = check_address (buffer + size,esp);    
+  if (!p->writable && to_write)  
+      sys_exit (-1);
+  return ;
+}
+
+/*Checking the address of string.
+Made by Taekang Eom
+Time: 11/29 20:34 */
+void check_string(const char *str, void* esp)
+{
+  unsigned cur = (unsigned) str;
+  int cur_length = (int)strlen(str);
+  struct page *p;
+  while (cur_length > 0)
+  {
+    p = check_address ((void*)cur,esp); 
+    cur += PGSIZE;
+    cur_length -= PGSIZE;
+  }
+  p = check_address (str + strlen (str), esp);    
+  return ;
+}
 
 #endif
 
@@ -66,7 +111,7 @@ void save_argument (void *esp,int *arg,int count)
   for (i=0;i<count;i++)
   {
     ptr = (int*)esp+i+1;
-    check_address (ptr);
+    check_address (ptr,esp);
     arg[i] = *ptr;
   }
 }
@@ -78,7 +123,7 @@ struct file *get_file (int fd)
 {
   if(fd<0 || fd>128)
     return NULL;
-  return thread_current ()->file_table[fd];
+  return thread_current () -> file_table[fd];
 }
 
 /*Shutdown pintos.
@@ -96,17 +141,21 @@ void sys_exit (int status)
 {
   struct thread *t = thread_current ();
   t->exit_status = status;
-  printf("%s: exit(%d)\n",t->name,status);
+  printf("%s: exit(%d)\n", t->name, status);
   thread_exit ();
 }
 
 /*Create and execute child process.
 Made by Taekang Eom
 Time: 10/10 23:01 */
-pid_t sys_exec (const *file)
+pid_t sys_exec (const char *file,void *esp)
 {
-  check_address(file);
-  check_address(file+strlen(file));
+  #ifndef VM
+  check_address (file,esp);
+  check_address (file + strlen (file),esp);
+  #else
+  check_string (file,esp);
+  #endif
   lock_acquire (&file_lock);
   tid_t tid = process_execute (file);
   lock_release (&file_lock);
@@ -124,8 +173,14 @@ int sys_wait (pid_t pid)
 /*Create File.
 Mate by Taekang Eom
 Time: 10/10 15:45 */
-bool sys_create (const char *file , unsigned initial_size)
+bool sys_create (const char *file , unsigned initial_size, void *esp)
 {
+  #ifndef VM
+  check_address (file,esp);
+  check_address (file + strlen (file),esp);
+  #else
+  check_string (file,esp);
+  #endif
   if (file == NULL)
     sys_exit (-1);
   lock_acquire (&file_lock);
@@ -137,8 +192,14 @@ bool sys_create (const char *file , unsigned initial_size)
 /*Remove File.
 Mate by Taekang Eom
 Time: 10/10 15:45 */
-bool sys_remove (const char *file)
+bool sys_remove (const char *file, void *esp)
 {
+  #ifndef VM
+  check_address (file,esp);
+  check_address (file + strlen (file),esp);
+  #else
+  check_string (file,esp);
+  #endif
   if (file == NULL)
     sys_exit (-1);
   lock_acquire (&file_lock);
@@ -151,8 +212,14 @@ bool sys_remove (const char *file)
 /*oepn file
 Made by Taekang Eom
 Time: 10/31 14:31*/
-int sys_open (const char *file)
+int sys_open (const char *file, void *esp)
 {
+  #ifndef VM
+  check_address (file,esp);
+  check_address (file + strlen (file),esp);
+  #else
+  check_string (file,esp);
+  #endif
   if(file == NULL)
     sys_exit (-1);
   lock_acquire (&file_lock);
@@ -187,17 +254,25 @@ int sys_filesize (int fd)
   return return_size;
 }
 
+
+
 /*Read from open file to buffer
 Made by Taekang Eom
 Time: 10/29 23:17*/
-int sys_read (int fd, void *buffer, unsigned size)
+int sys_read (int fd, void *buffer, unsigned size, void *esp)
 {
-  check_address (buffer);
-  check_address (buffer+size);
-  lock_acquire (&file_lock);
+  #ifndef VM
+  check_address (buffer,esp);
+  check_address (buffer+size,esp); 
+  #else
+  check_buffer (buffer,size,esp,true);
+  #endif
+  lock_acquire (&file_lock);  
   int return_size;
   if (fd == 0)
+  {   
     return_size = input_getc ();
+  }    
   else if (fd == 1)
     return_size = -1;
   else
@@ -208,6 +283,7 @@ int sys_read (int fd, void *buffer, unsigned size)
     else
       return_size = file_read (reading_file,buffer,size);
   }
+  
   lock_release (&file_lock);
   return return_size;
 }
@@ -215,10 +291,14 @@ int sys_read (int fd, void *buffer, unsigned size)
 /*Write from buffer to open file
 Made by Taekang Eom
 Time: 10/29 23:17*/
-int sys_write (int fd, void *buffer, unsigned size)
+int sys_write (int fd, void *buffer, unsigned size,void *esp)
 {
-  check_address (buffer);
-  check_address (buffer+size);
+  #ifndef VM
+  check_address (buffer,esp);
+  check_address (buffer+size,esp); 
+  #else
+  check_buffer (buffer,size,esp,false);
+  #endif
   lock_acquire (&file_lock);
   int return_size;
   if (fd == 1)
@@ -297,7 +377,7 @@ Time: 10/10 12:48 */
 static void
 syscall_handler (struct intr_frame *f) 
 {
-  check_address(f->esp);
+  check_address(f->esp,f->esp);
   int arg[3];
   int syscall_num = *(int*)f->esp;
   switch(syscall_num)
@@ -311,7 +391,7 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_EXEC:
       save_argument (f->esp,arg,1);
-      f->eax = sys_exec (arg[0]);
+      f->eax = sys_exec (arg[0],f->esp);
       break;
     case SYS_WAIT:
       save_argument (f->esp,arg,1);
@@ -319,15 +399,15 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_CREATE: 
       save_argument (f->esp,arg,2);
-      f->eax = sys_create (arg[0],arg[1]);
+      f->eax = sys_create (arg[0],arg[1],f->esp);
       break;
     case SYS_REMOVE:
       save_argument (f->esp,arg,1);
-      f->eax = sys_remove (arg[0]);  
+      f->eax = sys_remove (arg[0],f->esp);  
       break;            
     case SYS_OPEN:
       save_argument (f->esp,arg,1);
-      f->eax = sys_open (arg[0]);
+      f->eax = sys_open (arg[0],f->esp);
       break;             
     case SYS_FILESIZE:
       save_argument (f->esp,arg,1);
@@ -335,11 +415,11 @@ syscall_handler (struct intr_frame *f)
       break;         
     case SYS_READ:
       save_argument (f->esp,arg,3);
-      f->eax = sys_read (arg[0],arg[1],arg[2]);
+      f->eax = sys_read (arg[0],arg[1],arg[2],f->esp);
       break;             
     case SYS_WRITE: 
       save_argument (f->esp,arg,3);
-      f->eax = sys_write (arg[0],arg[1],arg[2]);
+      f->eax = sys_write (arg[0],arg[1],arg[2],f->esp);
       break;             
     case SYS_SEEK:
       save_argument (f->esp,arg,2);

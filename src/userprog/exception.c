@@ -8,7 +8,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/palloc.h"//added at 11/27 20:55
-
+#include "threads/vaddr.h"//added at 11/27 20:55
 #ifdef VM
   #include "vm/page.h"
 #endif
@@ -160,16 +160,20 @@ page_fault (struct intr_frame *f)
   #ifdef VM//added at 11/27 21:09
     struct page *p = find_page (&thread_current ()->supp_page_table,fault_addr);
     bool success = false;
-    if(p == NULL)
-    {     
-      sys_exit (-1);
+    //stack growth(added 11/28 18:10)
+    if (p == NULL )
+    {
+      if (grow_stack (fault_addr,f->esp))
+        return ;
+      else
+        sys_exit (-1);
     }
+    //load execute file
     if(p->type == EXE_PAGE)
     {
       uint8_t *kpage = palloc_get_page (PAL_USER);
       if(kpage == NULL)
-        sys_exit (-1);
-        
+        sys_exit (-1);       
       success = install_page (p->virtual_address,kpage,p->writable);
       if (!success)
       {       
@@ -178,9 +182,7 @@ page_fault (struct intr_frame *f)
       }
       p->physical_address = kpage;
       if (file_read_at(p->file,kpage,p->read_bytes,p->offset) != p->read_bytes)
-      {
         sys_exit (-1);
-      }
       memset (kpage + p->read_bytes, 0, p->zero_bytes); 
     }
     else if(p->type == FILE_PAGE)
@@ -189,7 +191,6 @@ page_fault (struct intr_frame *f)
     }
     if(success)
       return;
-
   #endif
   sys_exit (-1);//added at 11/02 04:17
 
