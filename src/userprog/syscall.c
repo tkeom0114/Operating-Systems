@@ -2,8 +2,8 @@
 #include "userprog/process.h"  //added at 10/10 23:05
 #include "userprog/pagedir.h"  //added at 11/13 01:57
 #include <stdio.h>
-#include <syscall-nr.h>   
-#include <string.h> 
+#include <syscall-nr.h>
+#include <string.h>
 #include "devices/input.h"
 #include "lib/user/syscall.h"   //added at 10/10 23:05
 #include "lib/kernel/stdio.h"  //added at 10/29 23:21
@@ -23,7 +23,7 @@ static void syscall_handler (struct intr_frame *);
 
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   lock_init (&file_lock);
@@ -39,7 +39,7 @@ void check_address (void *ptr, void *esp UNUSED)
   {
     sys_exit(-1);
   }
-    
+
 }
 #else
 /*Checking the address is in user space.
@@ -68,14 +68,14 @@ void check_buffer(void* buffer, unsigned size, void* esp, bool to_write)
   while (cur_size > 0)
   {
     p = check_address ((void*)cur_buffer,esp);
-    
+
     if (!p->writable && to_write)
-      sys_exit (-1);  
+      sys_exit (-1);
     cur_buffer += PGSIZE;
     cur_size -= PGSIZE;
   }
-  p = check_address (buffer + size,esp);    
-  if (!p->writable && to_write)  
+  p = check_address (buffer + size,esp);
+  if (!p->writable && to_write)
       sys_exit (-1);
   return ;
 }
@@ -90,11 +90,11 @@ void check_string(const char *str, void* esp)
   struct page *p;
   while (cur_length > 0)
   {
-    p = check_address ((void*)cur,esp); 
+    p = check_address ((void*)cur,esp);
     cur += PGSIZE;
     cur_length -= PGSIZE;
   }
-  p = check_address (str + strlen (str), esp);    
+  p = check_address (str + strlen (str), esp);
   return ;
 }
 
@@ -186,7 +186,7 @@ bool sys_create (const char *file , unsigned initial_size, void *esp)
   lock_acquire (&file_lock);
   bool success = filesys_create (file,initial_size);
   lock_release (&file_lock);
-  return success;  
+  return success;
 }
 
 /*Remove File.
@@ -206,7 +206,7 @@ bool sys_remove (const char *file, void *esp)
   bool success;
   success = filesys_remove (file);
   lock_release (&file_lock);
-  return success;  
+  return success;
 }
 
 /*oepn file
@@ -241,7 +241,7 @@ int sys_open (const char *file, void *esp)
 /* Returns the size of FILE in bytes.
 Made by Taekang Eom
 Time: 11/02 04:49 */
-int sys_filesize (int fd) 
+int sys_filesize (int fd)
 {
   int return_size;
   lock_acquire (&file_lock);
@@ -263,16 +263,16 @@ int sys_read (int fd, void *buffer, unsigned size, void *esp)
 {
   #ifndef VM
   check_address (buffer,esp);
-  check_address (buffer+size,esp); 
+  check_address (buffer+size,esp);
   #else
   check_buffer (buffer,size,esp,true);
   #endif
-  lock_acquire (&file_lock);  
+  lock_acquire (&file_lock);
   int return_size;
   if (fd == 0)
-  {   
+  {
     return_size = input_getc ();
-  }    
+  }
   else if (fd == 1)
     return_size = -1;
   else
@@ -283,7 +283,7 @@ int sys_read (int fd, void *buffer, unsigned size, void *esp)
     else
       return_size = file_read (reading_file,buffer,size);
   }
-  
+
   lock_release (&file_lock);
   return return_size;
 }
@@ -295,7 +295,7 @@ int sys_write (int fd, void *buffer, unsigned size,void *esp)
 {
   #ifndef VM
   check_address (buffer,esp);
-  check_address (buffer+size,esp); 
+  check_address (buffer+size,esp);
   #else
   check_buffer (buffer,size,esp,false);
   #endif
@@ -303,7 +303,7 @@ int sys_write (int fd, void *buffer, unsigned size,void *esp)
   int return_size;
   if (fd == 1)
   {
-    
+
     putbuf (buffer,size);
     return_size = size;
   }
@@ -340,10 +340,10 @@ void sys_close (int fd)
 }
 
 /* Sets the current position in FILE to NEW_POS bytes from the
-   start of the file. 
+   start of the file.
    Made by Taekang Eom
    Time: 11/02 03:23*/
-void sys_seek (int fd, unsigned position) 
+void sys_seek (int fd, unsigned position)
 {
   lock_acquire (&file_lock);
   struct file *seek_file = get_file (fd);
@@ -351,16 +351,16 @@ void sys_seek (int fd, unsigned position)
   {
     lock_release (&file_lock);
     sys_exit (-1);
-  } 
+  }
   file_seek (seek_file,position);
   lock_release (&file_lock);
 }
 
 /* Returns the current position in FILE as a byte offset from the
-   start of the file. 
+   start of the file.
    Made by Taekang Eom
    Time: 11/02 03:24*/
-unsigned sys_tell (int fd) 
+unsigned sys_tell (int fd)
 {
   lock_acquire (&file_lock);
   unsigned tell;
@@ -375,7 +375,7 @@ unsigned sys_tell (int fd)
 /*Fixed by Taekang Eom
 Time: 10/10 12:48 */
 static void
-syscall_handler (struct intr_frame *f) 
+syscall_handler (struct intr_frame *f)
 {
   check_address(f->esp,f->esp);
   int arg[3];
@@ -397,41 +397,75 @@ syscall_handler (struct intr_frame *f)
       save_argument (f->esp,arg,1);
       f->eax = sys_wait (arg[0]);
       break;
-    case SYS_CREATE: 
+    case SYS_CREATE:
       save_argument (f->esp,arg,2);
       f->eax = sys_create (arg[0],arg[1],f->esp);
       break;
     case SYS_REMOVE:
       save_argument (f->esp,arg,1);
-      f->eax = sys_remove (arg[0],f->esp);  
-      break;            
+      f->eax = sys_remove (arg[0],f->esp);
+      break;
     case SYS_OPEN:
       save_argument (f->esp,arg,1);
       f->eax = sys_open (arg[0],f->esp);
-      break;             
+      break;
     case SYS_FILESIZE:
       save_argument (f->esp,arg,1);
       f->eax = sys_filesize (arg[0]);
-      break;         
+      break;
     case SYS_READ:
       save_argument (f->esp,arg,3);
       f->eax = sys_read (arg[0],arg[1],arg[2],f->esp);
-      break;             
-    case SYS_WRITE: 
+      break;
+    case SYS_WRITE:
       save_argument (f->esp,arg,3);
       f->eax = sys_write (arg[0],arg[1],arg[2],f->esp);
-      break;             
+      break;
     case SYS_SEEK:
       save_argument (f->esp,arg,2);
       sys_seek (arg[0],arg[1]);
-      break;                
+      break;
     case SYS_TELL:
       save_argument (f->esp,arg,1);
       f->eax = sys_tell (arg[0]);
-      break;              
+      break;
     case SYS_CLOSE:
       save_argument (f->esp,arg,1);
       sys_close (arg[0]);
-      break;          
+      break;
   }
 }
+int mmap (int fd, void *addr)
+{
+  struct file *old_file = process_get_file(fd);
+  if (!old_file || !is_user_vaddr(addr) || addr < USER_VADDR_BOTTOM ||
+      ((uint32_t) addr % PGSIZE) != 0)
+    {
+      return ERROR;
+    }
+  struct file *file = file_reopen(old_file);
+  if (!file || file_length(old_file) == 0)
+    {
+      return ERROR;
+    }
+  thread_current()->mapid++;
+  int32_t ofs = 0;
+  uint32_t read_bytes = file_length(file);
+  while (read_bytes > 0)
+    {
+      uint32_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      uint32_t page_zero_bytes = PGSIZE - page_read_bytes;
+      if (!add_mmap_to_page_table(file, ofs,
+				  addr, page_read_bytes, page_zero_bytes))
+	{
+	  munmap(thread_current()->mapid);
+	  return ERROR;
+	}
+      read_bytes -= page_read_bytes;
+      ofs += page_read_bytes;
+      addr += PGSIZE;
+  }
+  return thread_current()->mapid;
+}
+
+
