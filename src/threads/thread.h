@@ -100,8 +100,8 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
     struct thread *parent;                /*Parent process.  added at 10/10 22:31 */
-    struct list child_list;                /*List of chiled processes.  added at 10/10 22:31 */       
-    struct list_elem child_elem;          /*list element for child list.  added at 10/10 22:31 */ 
+    struct list child_list;                /*List of chiled processes.  added at 10/10 22:31 */
+    struct list_elem child_elem;          /*list element for child list.  added at 10/10 22:31 */
     struct semaphore sema_load;           /*semaphre for wait child process loaded. added at 10/29 17:02 */
     struct semaphore sema_wait;           /*semaphre for wait child process exit. added at 10/29 17:02 */
     struct semaphore sema_remove;           /*semaphre for wait parent process remove child. added at 10/29 17:02 */
@@ -116,6 +116,8 @@ struct thread
 
 #ifdef VM//added at 11/27 15:33
     struct hash supp_page_table;
+    int mapid;
+    sturct list mmap_list;
     //struct hash mmap_file_table;
 #endif
     /* Owned by thread.c. */

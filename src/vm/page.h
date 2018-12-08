@@ -14,7 +14,8 @@ enum page_type
 {
 	EXE_PAGE=0,
 	FILE_PAGE,
-	SWAP_PAGE
+	SWAP_PAGE,
+    MMAP_PAGE
 };
 
 struct page
@@ -28,17 +29,9 @@ struct page
 	size_t read_bytes;//페이지에서 실제로 데이터가 쓰인 byte의 수
 	size_t zero_bytes;//0으로 채워야 할 byte의 수
 	struct hash_elem page_elem;//hash element로 사용함
-	struct list_elem frame_elem;//frame table에 사용됨	
+	struct list_elem frame_elem;//frame table에 사용됨
 	struct list_elem mmap_list_elem;//mmap_file의 page_list에 사용됨
 	size_t swap_slot;//disk로 swap된 경우 어느 slot에 있는지 알려줌
-};
-
-struct mmap_file// table of file mappings에 사용됨
-{
-	struct hash_elem mmap_elem;//hash element로 사용
-	struct list page_list;//해당 파일이 저장된 page들의 list
-	int mapid;//mmap을 통해 할당받은 mapid
-	struct file *file;//mapping한 file을 저장
 };
 //struct list frame_list;//frame table
 //struct list_elem clock;//clock algorithm에서 가리키는 page의 list_elem
@@ -51,4 +44,7 @@ struct page *find_page (struct hash *supp_page_table, void *virtual_address);
 void page_destroy_func (struct hash_elem*e, void *aux);
 void destroy_page_table (struct hash *supp_page_table);
 struct page* grow_stack (void *ptr, void *esp);
+
+bool add_mmap_to_page_table(struct file *file, size_t offset, uint8_t type,
+        size_t read_bytes, size_t zero_bytes);
 #endif

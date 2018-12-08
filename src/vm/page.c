@@ -24,7 +24,7 @@ void page_table_init (struct hash *supp_page_table)
 }
 
 bool insert_page (struct hash *supp_page_table, struct page *p)
-{   
+{
     struct hash_elem *e = hash_insert (supp_page_table,&p->page_elem);
     return (e == NULL);
 }
@@ -62,18 +62,18 @@ void destroy_page_table (struct hash *supp_page_table)
 struct page* grow_stack (void *ptr, void *esp)
 {
     if (ptr < esp-32 || ptr >= PHYS_BASE
-      || ptr < PHYS_BASE-0x00400000) 
+      || ptr < PHYS_BASE-0x00400000)
         return NULL;
     uint8_t *kpage = palloc_get_page (PAL_USER | PAL_ZERO);
     void *vpage;
-    if (kpage == NULL) 
+    if (kpage == NULL)
         return NULL;
     vpage = (void*)(((int)ptr>>PGBITS)<<PGBITS);
     if (!install_page (vpage, kpage, true))
     {
         palloc_free_page (kpage);
         return NULL;
-    }       
+    }
     struct page *p = malloc (sizeof (struct page));
     if (p == NULL)
         return NULL;
@@ -93,4 +93,23 @@ struct page* grow_stack (void *ptr, void *esp)
         return NULL;
     }
     return p;
+}
+bool add_mmap_to_page_table(struct file *file, size_t offset, void* uva,
+        size_t read_bytes, size_t zero_bytes){
+    struct page *page = malloc(sizeof(struct page));
+    if(!page){
+        return false;
+    }
+    page->file = file;
+    page->offset = offset;
+    page->virtual_address = uva;
+    page->read_bytes = read_bytes;
+    page->zero_bytes = zero_bytes;
+    page->type = MMAP_PAGE;
+    if(!process_add_mmap(page)){
+        free(page);
+        return false;
+    }
+    hash_insert(&thread_current()->supp_page_table, &page->elem);
+    return true;;
 }
