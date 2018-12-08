@@ -2,12 +2,6 @@
 #define USERPROG_PROCESS_H
 
 #include "threads/thread.h"
-struct process_file {
-    int fd;
-    struct file *file;
-    struct list_elem elem;
-};
-
 //struct mmap_file// table of file mappings에 사용됨
 //{
 	//struct hash_elem mmap_elem;//hash element로 사용

@@ -36,17 +36,22 @@ struct thread *get_child_thread (tid_t child_tid);
 tid_t
 process_execute (const char *file_name)
 {
+    /*printf("[ process.c / process_execute ] :: start\n");*/
   char *fn_copy,*save_ptr,*real_file_name;//fixed at 10/07 11:27
   tid_t tid;
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
+  /*printf("[ process.c / process_execute ] :: before palloc\n");*/
   fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  if (fn_copy == NULL){
+      /*printf("[ process.c / process_execute ] :: making copy failed\n");*/
     return TID_ERROR;
+  }
   strlcpy (fn_copy, file_name, PGSIZE);
   real_file_name = (char *) malloc (strlen (file_name) + 1);
   if (real_file_name == NULL)
   {
+      /*printf("[ process.c / process_execute ] :: allocating real_file_name failed\n");*/
     palloc_free_page (fn_copy);
     return TID_ERROR;
   }
@@ -54,8 +59,10 @@ process_execute (const char *file_name)
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (strtok_r(real_file_name," ",&save_ptr), PRI_DEFAULT, start_process, fn_copy);//fixed at 10/07 11:32
   free (real_file_name);//added at 11/09 22:47
-  if (tid == TID_ERROR)
+  if (tid == TID_ERROR){
+      /*printf("[ process.c / process_execute ] :: tid==TID_ERROR\n");*/
     palloc_free_page (fn_copy);
+  }
   struct thread *t = get_child_thread (tid);
   //waiting child prcess until loaded. added at 10/29 17:08
   sema_down(&t->sema_load);
@@ -78,6 +85,7 @@ start_process (void *file_name_)
   /* Initialize interrupt frame and load executable. */
   #ifdef VM
     page_table_init (&thread_current ()->supp_page_table);//added at 11/27 19:06
+    list_init(&thread_current()->mmap_list);
   #endif
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -155,14 +163,12 @@ process_wait (tid_t child_tid)
 void
 process_exit (void)
 {
+    /*printf("[ userprog / process_exit ] :: start\n");*/
   struct thread *cur = thread_current ();
   uint32_t *pd;
   //erase all childs and wake up parent added at 10/29 22:51
   struct list_elem *e = list_begin (&cur->child_list);
-  #ifdef VM
-    destroy_page_table(&cur->supp_page_table);
-  #endif
-  //fixed at 11/02 15:18
+    //fixed at 11/02 15:18
   for (int i = 2;i<cur->next_fd;i++)
   {
     if(cur->file_table[i] != NULL)
@@ -185,6 +191,12 @@ process_exit (void)
     file_allow_write (cur->execute_file);
     file_close (cur->execute_file);
   }
+  /*printf("[ process.c / process_exit ] :: destroy_page_table\n");*/
+#ifdef VM
+    process_remove_mmap(-1);
+    destroy_page_table(&(cur->supp_page_table));
+#endif
+
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -672,12 +684,36 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 bool process_add_mmap(struct page *page){
+    /*printf("[ process.c / process_add_mmap ] :: inside add_mmap\n");*/
     struct mmap_file *mm = malloc(sizeof(struct mmap_file));
     if(!mm){
+        /*printf("[ userprog / process.c ] :: allocating mmap failed\n");*/
         return false;
     }
-    mmap->page = page;
-    mmap->mapid = thread_currnet()->mapid;
-    list_push_back(*thread_current()->mmap_list, *mm->elem);
+    mm->page = page;
+    mm->mapid = thread_current()->mapid;
+    list_push_back(&thread_current()->mmap_list, &mm->elem);
     return true;
+}
+void process_remove_mmap (int mapid)
+{
+    /*printf("[ process.c / process_remove_mmap ] :: inside remove_mmap\n");*/
+    struct thread *t = thread_current();
+    struct list_elem *next, *e = list_begin(&t->mmap_list);
+
+    while(e != list_end(&t->mmap_list)){
+        next = list_next(e);
+        struct mmap_file *mm = list_entry(e, struct mmap_file, elem);
+        if(mm->mapid == mapid || mapid == -1){
+            /*printf("[ process.c / process_remove_mmap ] :: found mapid = %d\n",mm->mapid);*/
+            list_remove(&mm->elem);
+            /*printf("[ process.c / process_remove_mmap ] :: list_remove success\n");*/
+            hash_delete(&thread_current()->supp_page_table, &mm->page->page_elem);
+            free(mm->page);
+            /*printf("[ process.c / process_remove_mmap ] :: free(mm->page) success\n");*/
+            free(mm);
+            /*printf("[ process.c / process_remove_mmap ] :: free(mm) success\n");*/
+        }
+        e = next;
+    }
 }

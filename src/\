@@ -35,9 +35,10 @@ Time: 10/10 12:33 */
 #ifndef VM
 void check_address (void *ptr, void *esp UNUSED)
 {
-    /*printf("[ userprog / syscall.c ] :: ifndef!\n");*/
-    if(!is_user_vaddr(ptr) || ptr < USER_VADDR_BOTTOM)
-        sys_exit(-1);
+  if(!is_user_vaddr(ptr) || ptr < (void *)0x08048000)
+  {
+    sys_exit(-1);
+  }
 
 }
 #else
@@ -46,9 +47,8 @@ Made by Taekang Eom
 Time: 11/29 20:34 */
 struct page* check_address (void *ptr, void *esp)//fixed at 11/28 13:02
 {
-  /*printf("[ userprog / syscall.c ] :: inside check_address\n");*/
-  if(!is_user_vaddr(ptr) || ptr < USER_VADDR_BOTTOM)
-        sys_exit(-1);
+  printf("[userprog/syscall.c/check_address]\n");
+  if(!is_user_vaddr(ptr) || ptr < USER_VADDR_BOTTOM) sys_exit(-1);
   struct page *p = find_page(&thread_current ()->supp_page_table,ptr);
   if(p == NULL)
   {
@@ -108,7 +108,7 @@ Made by Taekang Eom
 Time: 10/10 12:43 */
 void save_argument (void *esp,int *arg,int count)
 {
-  /*printf("[userprog/syscall.c/save_argument] :: esp=%d , count=%d \n",(int)esp,count);*/
+  printf("[userprog/syscall.c/save_argument] :: esp=%d , count=%d \n",(int)esp,count);
   int i;
   int *ptr;
   for (i=0;i<count;i++)
@@ -160,7 +160,6 @@ pid_t sys_exec (const char *file,void *esp)
   check_string (file,esp);
   #endif
   lock_acquire (&file_lock);
-  /*printf("[ syscall.c / sys_exec ] :: starting process_execute\n");*/
   tid_t tid = process_execute (file);
   lock_release (&file_lock);
   return tid;
@@ -185,7 +184,6 @@ bool sys_create (const char *file , unsigned initial_size, void *esp)
   #else
   check_string (file,esp);
   #endif
-  /*printf("[ syscall.c / sys_create ] :: name : %s init_size = %d\n",file, (int)initial_size);*/
   if (file == NULL)
     sys_exit (-1);
   lock_acquire (&file_lock);
@@ -336,14 +334,12 @@ void sys_close (int fd)
   struct file *closing_file = get_file (fd);
   if (closing_file == NULL)
   {
-      /*printf("[ syscall.c / sys_close ] :: file not found\n");*/
     lock_release (&file_lock);
     sys_exit (-1);
   }
   file_close (closing_file);
   thread_current ()->file_table[fd] = NULL;
   lock_release (&file_lock);
-  /*printf("[ syscall.c / sys_close ] :: close success\n");*/
 }
 
 /* Sets the current position in FILE to NEW_POS bytes from the
@@ -398,8 +394,7 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_EXEC:
       save_argument (f->esp,arg,1);
-      check_string(arg[0], f->esp);
-      f->eax = sys_exec ((char*)arg[0],f->esp);
+      f->eax = sys_exec (arg[0],f->esp);
       break;
     case SYS_WAIT:
       save_argument (f->esp,arg,1);
@@ -407,17 +402,14 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_CREATE:
       save_argument (f->esp,arg,2);
-      check_string((void*)arg[0], f->esp);
-      f->eax = sys_create (arg[0],(unsigned)arg[1],f->esp);
+      f->eax = sys_create (arg[0],arg[1],f->esp);
       break;
     case SYS_REMOVE:
       save_argument (f->esp,arg,1);
-      check_string((void*)arg[0], f->esp);
       f->eax = sys_remove (arg[0],f->esp);
       break;
     case SYS_OPEN:
       save_argument (f->esp,arg,1);
-      check_string((void*)arg[0], f->esp);
       f->eax = sys_open (arg[0],f->esp);
       break;
     case SYS_FILESIZE:
@@ -426,12 +418,10 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_READ:
       save_argument (f->esp,arg,3);
-      check_buffer((void*)arg[1], (unsigned)arg[2], f->esp, true);
       f->eax = sys_read (arg[0],arg[1],arg[2],f->esp);
       break;
     case SYS_WRITE:
       save_argument (f->esp,arg,3);
-      check_buffer((void*)arg[1], (unsigned)arg[2], f->esp, false);
       f->eax = sys_write (arg[0],arg[1],arg[2],f->esp);
       break;
     case SYS_SEEK:
@@ -443,26 +433,19 @@ syscall_handler (struct intr_frame *f)
       f->eax = sys_tell (arg[0]);
       break;
     case SYS_CLOSE:
-      /*printf("[ syscall.c / syscall_handler ] :: sys_close\n");*/
       save_argument (f->esp,arg,1);
       sys_close (arg[0]);
-      /*printf("[ userprog / syscall.c ] :: status : %d\n",thread_current()->status);*/
       break;
     case SYS_MMAP:
-      /*printf("[ syscall.c / syscall_handler ] :: sys_mmap\n");*/
       save_argument(f->esp,arg,2);
       f->eax = mmap(arg[0], (void *) arg[1]);
       break;
-    case SYS_MUNMAP:
-      /*printf("[ syscall.c / syscall_handler ] :: sys_munmap\n");*/
-      save_argument(f->esp,arg,1);
-      munmap(arg[0]);
-      break;
+
   }
 }
 int mmap (int fd, void *addr)
 {
-  /*printf("[ syscall.c / mmap ] :: given args [fd : %d / addr : %d]\n",fd,(int)addr);*/
+  printf("[userprog/syscall.c/mmap]:: given args [fd : %d / addr : %d]\n",fd,(int)addr);
   struct file *_file = get_file(fd);
   if (!_file || !is_user_vaddr(addr) || addr < USER_VADDR_BOTTOM ||
       ((uint32_t) addr % PGSIZE) != 0)
@@ -477,12 +460,10 @@ int mmap (int fd, void *addr)
   thread_current()->mapid++;
   int32_t ofs = 0;
   uint32_t read_bytes = file_length(file);
-  printf("[ syscall.c / mmap ] :: bytes_to_read : %d\n",read_bytes);
   while (read_bytes > 0)
     {
       uint32_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       uint32_t page_zero_bytes = PGSIZE - page_read_bytes;
-      /*printf("[ syscall.c / mmap ] :: page_read_bytes = %d\n",page_read_bytes);*/
       if (!add_mmap_to_page_table(file, ofs,
 				  addr, page_read_bytes, page_zero_bytes))
 	{
@@ -491,14 +472,11 @@ int mmap (int fd, void *addr)
       read_bytes -= page_read_bytes;
       ofs += page_read_bytes;
       addr += PGSIZE;
-      /*printf("[ syscall.c / mmap ] :: read_bytes = %d ofs = %d \n",page_read_bytes, ofs);*/
   }
-  /*printf("[ syscall.c / mmap ] :: returning mapid : %d\n",thread_current()->mapid);*/
   return thread_current()->mapid;
 }
-void munmap(int mapid)
+void unmmap(int mapid)
 {
-    /*printf("[ userprog / syscall.c ] :: given args : %d\n",mapid);*/
     process_remove_mmap(mapid);
 }
 

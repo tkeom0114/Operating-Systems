@@ -18,10 +18,12 @@ test_main (void)
   char buf[1024];
 
   /* Write file via mmap. */
+  printf("[ mmap-write.c / test_main ] :: strlen(sample): %d\n",strlen(sample));
   CHECK (create ("sample.txt", strlen (sample)), "create \"sample.txt\"");
   CHECK ((handle = open ("sample.txt")) > 1, "open \"sample.txt\"");
   CHECK ((map = mmap (handle, ACTUAL)) != MAP_FAILED, "mmap \"sample.txt\"");
   memcpy (ACTUAL, sample, strlen (sample));
+  printf("[ mmap-write.c / test_main ] :: finished memcpy\n");
   munmap (map);
 
   /* Read back via read(). */

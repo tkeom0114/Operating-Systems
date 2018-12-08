@@ -117,7 +117,7 @@ struct thread
 #ifdef VM//added at 11/27 15:33
     struct hash supp_page_table;
     int mapid;
-    sturct list mmap_list;
+    struct list mmap_list;
     //struct hash mmap_file_table;
 #endif
     /* Owned by thread.c. */
