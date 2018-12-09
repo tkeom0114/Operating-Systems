@@ -6,7 +6,6 @@
 void *
 memcpy (void *dst_, const void *src_, size_t size)
 {
-    printf("[ string.c / memcpy ] :: start, size : %d\n",size);
   unsigned char *dst = dst_;
   const unsigned char *src = src_;
 
@@ -14,7 +13,6 @@ memcpy (void *dst_, const void *src_, size_t size)
   ASSERT (src != NULL || size == 0);
 
   while (size-- > 0){
-      printf("[ string.c / memcpy ] :: copying src : %c\n",src);
     *dst++ = *src++;
   }
 
@@ -58,10 +56,12 @@ memcmp (const void *a_, const void *b_, size_t size)
   const unsigned char *a = a_;
   const unsigned char *b = b_;
 
+  size_t count=0;
+
   ASSERT (a != NULL || size == 0);
   ASSERT (b != NULL || size == 0);
   for (; size-- > 0; a++, b++){
-      printf("[ string.c / memcmp ] :: buf : %d sample : %d\n",*a, *b);
+    
     if (*a != *b){
       return *a > *b ? +1 : -1;
     }

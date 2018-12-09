@@ -13,7 +13,6 @@ Time: 11/27 15:54
 enum page_type
 {
 	EXE_PAGE=0,
-	FILE_PAGE,
 	SWAP_PAGE,
     MMAP_PAGE
 };

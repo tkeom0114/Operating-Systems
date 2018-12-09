@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <hash.h>
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -194,6 +195,14 @@ process_exit (void)
   /*printf("[ process.c / process_exit ] :: destroy_page_table\n");*/
 #ifdef VM
     process_remove_mmap(-1);
+    /*struct hash_iterator i;
+
+    hash_first (&i, &thread_current()->supp_page_table);
+    while (hash_next (&i))
+        {
+          struct page *p = hash_entry (hash_cur (&i), struct page, page_elem);
+          printf("virtual address:%lx\n",p->virtual_address);
+        }*/
     destroy_page_table(&(cur->supp_page_table));
 #endif
 
@@ -683,6 +692,7 @@ install_page (void *upage, void *kpage, bool writable)
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
+
 bool process_add_mmap(struct page *page){
     /*printf("[ process.c / process_add_mmap ] :: inside add_mmap\n");*/
     struct mmap_file *mm = malloc(sizeof(struct mmap_file));
@@ -695,25 +705,34 @@ bool process_add_mmap(struct page *page){
     list_push_back(&thread_current()->mmap_list, &mm->elem);
     return true;
 }
+
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/mmap-unmap -a mmap-unmap -p ../../tests/vm/sample.txt -a sample.txt --swap-size=4 -- -q  -f run mmap-unmap
+
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/mmap-overlap -a mmap-overlap -p tests/vm/zeros -a zeros --swap-size=4 -- -q  -f run mmap-overlap
+
 void process_remove_mmap (int mapid)
 {
-    /*printf("[ process.c / process_remove_mmap ] :: inside remove_mmap\n");*/
-    struct thread *t = thread_current();
-    struct list_elem *next, *e = list_begin(&t->mmap_list);
+  struct thread *t = thread_current();
+  struct list_elem *next, *e = list_begin(&t->mmap_list);
 
-    while(e != list_end(&t->mmap_list)){
-        next = list_next(e);
-        struct mmap_file *mm = list_entry(e, struct mmap_file, elem);
-        if(mm->mapid == mapid || mapid == -1){
-            /*printf("[ process.c / process_remove_mmap ] :: found mapid = %d\n",mm->mapid);*/
-            list_remove(&mm->elem);
-            /*printf("[ process.c / process_remove_mmap ] :: list_remove success\n");*/
-            hash_delete(&thread_current()->supp_page_table, &mm->page->page_elem);
-            free(mm->page);
-            /*printf("[ process.c / process_remove_mmap ] :: free(mm->page) success\n");*/
-            free(mm);
-            /*printf("[ process.c / process_remove_mmap ] :: free(mm) success\n");*/
+  while(e != list_end(&t->mmap_list))
+  {
+    next = list_next(e);
+    struct mmap_file *mm = list_entry(e, struct mmap_file, elem);
+    if(mm->mapid == mapid || mapid==-1)
+    {
+      if(mm->page->physical_address != NULL)
+      {
+        struct page *p=mm->page;
+        if(pagedir_is_dirty(thread_current()->pagedir,p->virtual_address))
+        {             
+          file_write_at (p->file,p->physical_address,p->read_bytes,p->offset);
         }
-        e = next;
+      }
+      list_remove(&mm->elem);
+      delete_page (&thread_current()->supp_page_table,mm->page);
+      free(mm);
     }
+      e = next;
+  }
 }

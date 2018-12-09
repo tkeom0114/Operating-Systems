@@ -179,15 +179,11 @@ page_fault (struct intr_frame *f)
       {
         palloc_free_page (kpage);
         sys_exit (-1);
-      }
+      }     
       p->physical_address = kpage;
       if (file_read_at(p->file,kpage,p->read_bytes,p->offset) != p->read_bytes)
         sys_exit (-1);
       memset (kpage + p->read_bytes, 0, p->zero_bytes);
-    }
-    else if(p->type == FILE_PAGE)
-    {
-
     }
     else if(p->type == MMAP_PAGE){
        uint8_t *kpage = palloc_get_page(PAL_USER);
@@ -199,7 +195,7 @@ page_fault (struct intr_frame *f)
        if(!success){
            palloc_free_page(kpage);
            sys_exit(-1);
-       }
+       }       
        p->physical_address = kpage;
        /*printf("[ exception.c / page_fault ] :: p->read_bytes = %d\n",p->read_bytes);*/
        /*printf("[ exception.c / page_fault ] :: p->offset     = %d\n",p->offset);*/

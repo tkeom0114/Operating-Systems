@@ -22,6 +22,7 @@
 static void syscall_handler (struct intr_frame *);
 
 
+
 void
 syscall_init (void)
 {
@@ -379,6 +380,8 @@ unsigned sys_tell (int fd)
   return tell;
 }
 
+
+
 /*Fixed by Taekang Eom
 Time: 10/10 12:48 */
 static void
@@ -451,54 +454,60 @@ syscall_handler (struct intr_frame *f)
     case SYS_MMAP:
       /*printf("[ syscall.c / syscall_handler ] :: sys_mmap\n");*/
       save_argument(f->esp,arg,2);
-      f->eax = mmap(arg[0], (void *) arg[1]);
+      f->eax = sys_mmap(arg[0], (void *) arg[1]);
       break;
     case SYS_MUNMAP:
       /*printf("[ syscall.c / syscall_handler ] :: sys_munmap\n");*/
       save_argument(f->esp,arg,1);
-      munmap(arg[0]);
+      sys_munmap(arg[0]);
       break;
   }
 }
-int mmap (int fd, void *addr)
+int sys_mmap (int fd, void *addr)
 {
-  /*printf("[ syscall.c / mmap ] :: given args [fd : %d / addr : %d]\n",fd,(int)addr);*/
+  lock_acquire (&file_lock);
   struct file *_file = get_file(fd);
   if (!_file || !is_user_vaddr(addr) || addr < USER_VADDR_BOTTOM ||
       ((uint32_t) addr % PGSIZE) != 0)
-    {
-      return -1;
-    }
+  {
+    lock_release (&file_lock);
+    return -1;
+  }
+  if(pagedir_get_page(thread_current()->pagedir,addr)!=NULL)
+  {
+    lock_release (&file_lock);
+    return -1;
+  }
   struct file *file = file_reopen(_file);
   if (!file || file_length(_file) == 0)
     {
+      lock_release (&file_lock);
       return -1;
     }
   thread_current()->mapid++;
   int32_t ofs = 0;
   uint32_t read_bytes = file_length(file);
-  printf("[ syscall.c / mmap ] :: bytes_to_read : %d\n",read_bytes);
   while (read_bytes > 0)
-    {
-      uint32_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
-      uint32_t page_zero_bytes = PGSIZE - page_read_bytes;
-      /*printf("[ syscall.c / mmap ] :: page_read_bytes = %d\n",page_read_bytes);*/
-      if (!add_mmap_to_page_table(file, ofs,
+  {
+    uint32_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+    uint32_t page_zero_bytes = PGSIZE - page_read_bytes;
+    if (!add_mmap_to_page_table(file, ofs,
 				  addr, page_read_bytes, page_zero_bytes))
-	{
-	  return -1;
-	}
-      read_bytes -= page_read_bytes;
-      ofs += page_read_bytes;
-      addr += PGSIZE;
-      /*printf("[ syscall.c / mmap ] :: read_bytes = %d ofs = %d \n",page_read_bytes, ofs);*/
+	  {
+      lock_release (&file_lock);
+	    return -1;
+	  }
+    read_bytes -= page_read_bytes;
+    ofs += page_read_bytes;
+    addr += PGSIZE;
   }
-  /*printf("[ syscall.c / mmap ] :: returning mapid : %d\n",thread_current()->mapid);*/
+  lock_release (&file_lock);
   return thread_current()->mapid;
 }
-void munmap(int mapid)
+void sys_munmap(int mapid)
 {
-    /*printf("[ userprog / syscall.c ] :: given args : %d\n",mapid);*/
-    process_remove_mmap(mapid);
+  lock_acquire (&file_lock);
+  process_remove_mmap(mapid);
+  lock_release (&file_lock);
 }
 

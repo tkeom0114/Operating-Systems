@@ -33,8 +33,8 @@ bool delete_page (struct hash *supp_page_table, struct page *p)
 {
     struct hash_elem *e = hash_delete (supp_page_table,&p->page_elem);
     if(p->physical_address != NULL){
-        pagedir_clear_page(thread_current()->pagedir, p->virtual_address);
-        palloc_free_page(p->physical_address);
+        //pagedir_clear_page(thread_current()->pagedir, p->virtual_address);//debugging
+        //palloc_free_page(p->physical_address);//debugging
     }
     free(p);
     return (e != NULL);
@@ -57,9 +57,10 @@ struct page *find_page (struct hash *supp_page_table, void *virtual_address)
 void page_destroy_func (struct hash_elem *e, void *aux)
 {
     struct page *p = hash_entry (e,struct page,page_elem);
-    if(p->physical_address != NULL){
-        pagedir_clear_page(thread_current()->pagedir, p->virtual_address);
-        palloc_free_page(p->physical_address);
+    if(p->physical_address != NULL)
+    {
+        //pagedir_clear_page(thread_current()->pagedir, p->virtual_address);
+        //palloc_free_page(p->physical_address);
     }
     free(p);
 }
@@ -125,9 +126,9 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
         free(p);
         return false;
     }
-    if (hash_insert(&thread_current()->supp_page_table, &p->page_elem)){
+    if (!insert_page (&thread_current()->supp_page_table, p)){
         return false;
     }
-    /*printf("[ page.c / add_mmap_to_page_table ] :: success\n");*/
+    //printf("[ page.c / add_mmap_to_page_table ] :: success\n");
     return true;
 }
