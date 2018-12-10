@@ -85,8 +85,7 @@ struct page* grow_stack (void *ptr, void *esp)
     void *vpage;
     if (kpage == NULL)
     {
-        kpage = evict_page ();
-        lock_release (&evict_lock);
+        kpage = evict_page (PAL_USER | PAL_ZERO);
         if(kpage == NULL)
         {
           //printf ("Failed!\n");//debugging
@@ -154,9 +153,8 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
 
 //pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/page-merge-mm -a page-merge-mm -p tests/vm/child-qsort-mm -a child-qsort-mm --swap-size=4 -- -q  -f run page-merge-mm
 
- uint8_t *evict_page ()
+ uint8_t *evict_page (uint8_t flag)
  {
-     lock_acquire (&evict_lock);
      //printf ("Failed1!\n");//debugging
     if(list_empty (&frame_list))
     {
@@ -206,6 +204,6 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
         clock = list_next (clock);
     }
     
-    return palloc_get_page (PAL_USER | PAL_ZERO);
+    return palloc_get_page (flag);
 
  }

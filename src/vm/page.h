@@ -45,7 +45,7 @@ struct page *find_page (struct hash *supp_page_table, void *virtual_address);
 void page_destroy_func (struct hash_elem*e, void *aux);
 void destroy_page_table (struct hash *supp_page_table);
 struct page* grow_stack (void *ptr, void *esp);
-uint8_t *evict_page ();
+uint8_t *evict_page (uint8_t flag);
 
 bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
         uint32_t read_bytes, uint32_t zero_bytes);

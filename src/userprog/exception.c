@@ -186,8 +186,7 @@ page_fault (struct intr_frame *f)
       if(kpage == NULL)
       {
         //printf ("Failed!\n");//debugging
-        kpage = evict_page ();
-        lock_release (&evict_lock);
+        kpage = evict_page (PAL_USER);
         if(kpage == NULL)
         {
           lock_release (&fault_lock);
@@ -218,8 +217,7 @@ page_fault (struct intr_frame *f)
       if(kpage == NULL)
       {
         //printf ("Failed!\n");//debugging
-        kpage = evict_page ();
-        lock_release (&evict_lock);
+        kpage = evict_page (PAL_USER);
         if(kpage == NULL)
         {
           lock_release (&fault_lock);
@@ -253,8 +251,7 @@ page_fault (struct intr_frame *f)
       if(kpage == NULL)
       {
         //printf ("Failed!\n");//debugging
-        kpage = evict_page ();
-        lock_release (&evict_lock);
+        kpage = evict_page (PAL_USER | PAL_ZERO);
         if(kpage == NULL)
         {
           lock_release (&fault_lock);

@@ -227,6 +227,7 @@ process_exit (void)
   sema_up (&cur->sema_wait);
   if(cur->parent != NULL)
     sema_down (&cur->sema_remove);
+
 }
 
 /* Sets up the CPU for running user code in the current
