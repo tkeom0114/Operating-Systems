@@ -84,7 +84,16 @@ struct page* grow_stack (void *ptr, void *esp)
     uint8_t *kpage = palloc_get_page (PAL_USER | PAL_ZERO);
     void *vpage;
     if (kpage == NULL)
-        return NULL;
+    {
+        kpage = evict_page ();
+        lock_release (&evict_lock);
+        if(kpage == NULL)
+        {
+          //printf ("Failed!\n");//debugging
+          return NULL;
+        }
+    }
+        
     vpage = (void*)(((int)ptr>>PGBITS)<<PGBITS);
     /*printf("{vm/page.c/grow_stack] :: vpage val : %d",(int)vpage);*/
     if (!install_page (vpage, kpage, true))

@@ -161,15 +161,23 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
   #ifdef VM//added at 11/27 21:09
+    lock_acquire (&fault_lock);
     struct page *p = find_page (&thread_current ()->supp_page_table,fault_addr);
     bool success = false;
     //stack growth(added 11/28 18:10)
     if (p == NULL )
     {
       if (grow_stack (fault_addr,f->esp))
+      {
+        lock_release (&fault_lock);
         return ;
+      }  
       else
+      {
+        lock_release (&fault_lock);
         sys_exit (-1);
+      }
+        
     }
     //load execute file
     if(p->type == EXE_PAGE)
@@ -182,6 +190,7 @@ page_fault (struct intr_frame *f)
         lock_release (&evict_lock);
         if(kpage == NULL)
         {
+          lock_release (&fault_lock);
           //printf ("Failed!\n");//debugging
           sys_exit (-1);
         }
@@ -191,11 +200,16 @@ page_fault (struct intr_frame *f)
       if (!success)
       {
         palloc_free_page (kpage);
+        lock_release (&fault_lock);
         sys_exit (-1);
       }     
       p->physical_address = kpage;
       if (file_read_at(p->file,kpage,p->read_bytes,p->offset) != p->read_bytes)
+      {
+        lock_release (&fault_lock);
         sys_exit (-1);
+      }
+        
       memset (kpage + p->read_bytes, 0, p->zero_bytes);
       list_push_back (&frame_list,&p->frame_elem);
     }
@@ -208,6 +222,7 @@ page_fault (struct intr_frame *f)
         lock_release (&evict_lock);
         if(kpage == NULL)
         {
+          lock_release (&fault_lock);
           //printf ("Failed!\n");//debugging
           sys_exit (-1);
         }
@@ -217,13 +232,18 @@ page_fault (struct intr_frame *f)
        /*printf("[ exception.c / page_fault ] :: p->read_bytes = %d\n",p->read_bytes);*/
        if(!success){
            palloc_free_page(kpage);
+           lock_release (&fault_lock);
            sys_exit(-1);
        }       
        p->physical_address = kpage;
        /*printf("[ exception.c / page_fault ] :: p->read_bytes = %d\n",p->read_bytes);*/
        /*printf("[ exception.c / page_fault ] :: p->offset     = %d\n",p->offset);*/
        if(file_read_at(p->file, kpage, p->read_bytes,p->offset) != p->read_bytes)
-           sys_exit(-1);
+       {
+         lock_release (&fault_lock);
+         sys_exit(-1);
+       }
+           
        memset(kpage + p->read_bytes, 0, p->zero_bytes);
        list_push_back (&frame_list,&p->frame_elem);
     }
@@ -237,6 +257,7 @@ page_fault (struct intr_frame *f)
         lock_release (&evict_lock);
         if(kpage == NULL)
         {
+          lock_release (&fault_lock);
           //printf ("Failed!\n");//debugging
           sys_exit (-1);
         }
@@ -246,6 +267,7 @@ page_fault (struct intr_frame *f)
       if (!success)
       {
         palloc_free_page (kpage);
+        lock_release (&fault_lock);
         sys_exit (-1);
       }
       bitmap_flip (swap_table,p->swap_slot);
@@ -255,8 +277,12 @@ page_fault (struct intr_frame *f)
       p->physical_address = kpage;
       list_push_back (&frame_list,&p->frame_elem);
     }
+    lock_release (&fault_lock);
     if(success)
+    {
       return;
+    }
+      
   #endif
   sys_exit (-1);//added at 11/02 04:17
 

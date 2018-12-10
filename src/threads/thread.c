@@ -20,6 +20,7 @@
 #include <bitmap.h>
 #include "devices/block.h"
 #include "vm/page.h"
+#include "userprog/exception.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -111,6 +112,7 @@ thread_init (void)
   #ifdef VM
     lock_init (&evict_lock);
     list_init (&frame_list);
+    lock_init (&fault_lock);
     
   #endif
 }
