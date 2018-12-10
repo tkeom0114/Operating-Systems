@@ -1,5 +1,6 @@
 #include "vm/page.h"
 #include <hash.h>
+#include <list.h>
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "threads/thread.h"
@@ -32,9 +33,9 @@ bool insert_page (struct hash *supp_page_table, struct page *p)
 bool delete_page (struct hash *supp_page_table, struct page *p)
 {
     struct hash_elem *e = hash_delete (supp_page_table,&p->page_elem);
-    if(p->physical_address != NULL){
-        //pagedir_clear_page(thread_current()->pagedir, p->virtual_address);//debugging
-        //palloc_free_page(p->physical_address);//debugging
+    if(p->physical_address != NULL)
+    {
+        list_remove (&p->frame_elem);
     }
     free(p);
     return (e != NULL);
@@ -59,11 +60,11 @@ void page_destroy_func (struct hash_elem *e, void *aux)
     struct page *p = hash_entry (e,struct page,page_elem);
     if(p->physical_address != NULL)
     {
-        //pagedir_clear_page(thread_current()->pagedir, p->virtual_address);
-        //palloc_free_page(p->physical_address);
+        list_remove (&p->frame_elem);
     }
     free(p);
 }
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/mmap-overlap -a mmap-overlap -p tests/vm/zeros -a zeros --swap-size=4 -- -q  -f run mmap-overlap
 
 void destroy_page_table (struct hash *supp_page_table)
 {
@@ -105,6 +106,7 @@ struct page* grow_stack (void *ptr, void *esp)
         palloc_free_page (kpage);
         return NULL;
     }
+    list_push_back (&frame_list,&p->frame_elem);
     return p;
 }
 bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
@@ -117,6 +119,7 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
     p->file = file;
     p->offset = offset;
     p->virtual_address = upage;
+    p->physical_address = NULL;
     p->writable = true;
     p->read_bytes = read_bytes;
     p->zero_bytes = zero_bytes;

@@ -184,6 +184,7 @@ page_fault (struct intr_frame *f)
       if (file_read_at(p->file,kpage,p->read_bytes,p->offset) != p->read_bytes)
         sys_exit (-1);
       memset (kpage + p->read_bytes, 0, p->zero_bytes);
+      list_push_back (&frame_list,&p->frame_elem);
     }
     else if(p->type == MMAP_PAGE){
        uint8_t *kpage = palloc_get_page(PAL_USER);
@@ -202,6 +203,7 @@ page_fault (struct intr_frame *f)
        if(file_read_at(p->file, kpage, p->read_bytes,p->offset) != p->read_bytes)
            sys_exit(-1);
        memset(kpage + p->read_bytes, 0, p->zero_bytes);
+       list_push_back (&frame_list,&p->frame_elem);
     }
     if(success)
       return;

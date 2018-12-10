@@ -16,6 +16,11 @@
 #include "userprog/process.h"
 #include "threads/malloc.h"
 #endif
+#ifdef VM
+#include <bitmap.h>
+#include "devices/block.h"
+#include "vm/page.h"
+#endif
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -102,6 +107,13 @@ thread_init (void)
   initial_thread->tid = allocate_tid ();
   #ifdef USERPROG
     list_init(&thread_current ()->child_list);
+  #endif
+  #ifdef VM
+    list_init (&frame_list);
+    clock = frame_list.head;
+    swap_block = block_get_role (BLOCK_SWAP);
+	  swap_size = block_size (swap_block);
+	  swap_table = bitmap_create( swap_size);
   #endif
 }
 

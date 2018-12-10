@@ -194,15 +194,16 @@ process_exit (void)
   }
   /*printf("[ process.c / process_exit ] :: destroy_page_table\n");*/
 #ifdef VM
-    process_remove_mmap(-1);
-    /*struct hash_iterator i;
-
+   /* struct hash_iterator i;//debugging
     hash_first (&i, &thread_current()->supp_page_table);
-    while (hash_next (&i))
+      while (hash_next (&i))
         {
           struct page *p = hash_entry (hash_cur (&i), struct page, page_elem);
           printf("virtual address:%lx\n",p->virtual_address);
+          printf("physical address:%lx\n",p->physical_address);
         }*/
+
+    process_remove_mmap(-1);
     destroy_page_table(&(cur->supp_page_table));
 #endif
 
@@ -616,6 +617,7 @@ setup_stack (void **esp, char *file_name)
     palloc_free_page (kpage);
     return false;
   }
+  list_push_back(&frame_list,&p->frame_elem);
   success = true;
 #endif
   /*Push arguments to stack
