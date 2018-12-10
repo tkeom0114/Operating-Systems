@@ -179,6 +179,7 @@ page_fault (struct intr_frame *f)
       {
         //printf ("Failed!\n");//debugging
         kpage = evict_page ();
+        lock_release (&evict_lock);
         if(kpage == NULL)
         {
           //printf ("Failed!\n");//debugging
@@ -204,6 +205,7 @@ page_fault (struct intr_frame *f)
       {
         //printf ("Failed!\n");//debugging
         kpage = evict_page ();
+        lock_release (&evict_lock);
         if(kpage == NULL)
         {
           //printf ("Failed!\n");//debugging
@@ -227,11 +229,12 @@ page_fault (struct intr_frame *f)
     }
     else if(SWAP_PAGE)
     {
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+      uint8_t *kpage = palloc_get_page (PAL_USER | PAL_ZERO);
       if(kpage == NULL)
       {
         //printf ("Failed!\n");//debugging
         kpage = evict_page ();
+        lock_release (&evict_lock);
         if(kpage == NULL)
         {
           //printf ("Failed!\n");//debugging
@@ -249,6 +252,8 @@ page_fault (struct intr_frame *f)
       for(int i=0;i<8;i++)
         block_read (swap_block,8*p->swap_slot+i,kpage+i*BLOCK_SECTOR_SIZE);
       p->swap_slot = -1;
+      p->physical_address = kpage;
+      list_push_back (&frame_list,&p->frame_elem);
     }
     if(success)
       return;

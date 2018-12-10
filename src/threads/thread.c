@@ -109,8 +109,8 @@ thread_init (void)
     list_init(&thread_current ()->child_list);
   #endif
   #ifdef VM
+    lock_init (&evict_lock);
     list_init (&frame_list);
-    clock = NULL;
     
   #endif
 }

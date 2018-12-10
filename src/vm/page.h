@@ -33,10 +33,10 @@ struct page
 	size_t swap_slot;//disk로 swap된 경우 어느 slot에 있는지 알려줌
 };
 struct list frame_list;//frame table
-struct list_elem *clock;//clock algorithm에서 가리키는 page의 list_elem
 struct bitmap *swap_table;//swap_table
 struct block *swap_block;
 size_t swap_size;
+struct lock evict_lock;
 
 void page_table_init (struct hash *supp_page_table);
 bool insert_page (struct hash *supp_page_table, struct page *p);

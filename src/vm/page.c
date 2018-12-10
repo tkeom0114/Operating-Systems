@@ -11,6 +11,7 @@
 #include <stdio.h>
 
 
+
 static unsigned page_hash_func (const struct hash_elem *e, void *aux)
 {
     struct page *p = hash_entry (e,struct page,page_elem);
@@ -140,28 +141,37 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
     return true;
 }
 
+//pintos -v -k -T 600 --qemu  --filesys-size=2 -p tests/vm/page-merge-par -a page-merge-par -p tests/vm/child-sort -a child-sort --swap-size=4 -- -q  -f run page-merge-par
+
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/page-merge-mm -a page-merge-mm -p tests/vm/child-qsort-mm -a child-qsort-mm --swap-size=4 -- -q  -f run page-merge-mm
+
  uint8_t *evict_page ()
  {
-     printf ("Failed1!\n");//debugging
+     lock_acquire (&evict_lock);
+     //printf ("Failed1!\n");//debugging
     if(list_empty (&frame_list))
+    {
         return NULL;
-    clock=list_begin(&frame_list);
+    }      
+    struct list_elem *clock=list_begin(&frame_list);
     while(true)
     {       
-        if(clock==&frame_list.tail)
+        if(clock==list_end(&frame_list))
+        {
             clock = list_begin (&frame_list);
-        printf ("Failed2!\n");//debugging
+        }
+        //printf ("Failed2!\n");//debugging
         struct page *p = list_entry (clock,struct page,frame_elem);
         if (pagedir_is_accessed (thread_current()->pagedir,p->virtual_address))
         {
-            printf ("Failed3!\n");//debugging
+            //printf ("Failed3!\n");//debugging
             pagedir_set_accessed (thread_current()->pagedir,p->virtual_address,false);    
         } 
         else
         {
             if(pagedir_is_dirty (thread_current()->pagedir,p->virtual_address) || p->type==SWAP_PAGE)
             {
-                printf ("Failed4!\n");//debugging
+                //printf ("Failed4!\n");//debugging
                 if (p->type==MMAP_PAGE)
                 {
                     file_write_at (p->file,p->physical_address,p->read_bytes,p->offset);
@@ -173,20 +183,20 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
                     for(size_t i=0;i<8;i++)
                         block_write (swap_block,8*slot+i,p->physical_address+i*BLOCK_SECTOR_SIZE);
                     p->swap_slot=slot;
-                    printf ("Failed5!\n");//debugging
+                    //printf ("Failed5!\n");//debugging
                 }     
             }
-            pagedir_clear_page (thread_current ()->pagedir,p->virtual_address);
-            palloc_free_page (p->physical_address);
             list_remove (&p->frame_elem);
+            pagedir_clear_page (thread_current ()->pagedir,p->virtual_address);
+            palloc_free_page (p->physical_address);         
             p->physical_address=NULL;
-            printf ("Failed6!\n");//debugging
+            //printf ("Failed6!\n");//debugging
             break;
             
         }
         clock = list_next (clock);
     }
     
-    return palloc_get_page (PAL_USER);
+    return palloc_get_page (PAL_USER | PAL_ZERO);
 
  }
