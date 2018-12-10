@@ -110,10 +110,8 @@ thread_init (void)
   #endif
   #ifdef VM
     list_init (&frame_list);
-    clock = frame_list.head;
-    swap_block = block_get_role (BLOCK_SWAP);
-	  swap_size = block_size (swap_block);
-	  swap_table = bitmap_create( swap_size);
+    clock = NULL;
+    
   #endif
 }
 

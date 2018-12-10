@@ -1,10 +1,13 @@
 #include "vm/page.h"
 #include <hash.h>
 #include <list.h>
+#include <bitmap.h>
 #include "threads/malloc.h"
 #include "threads/vaddr.h"
 #include "threads/thread.h"
 #include "threads/palloc.h"
+#include "userprog/pagedir.h"
+#include "devices/block.h"
 #include <stdio.h>
 
 
@@ -109,6 +112,7 @@ struct page* grow_stack (void *ptr, void *esp)
     list_push_back (&frame_list,&p->frame_elem);
     return p;
 }
+
 bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
         uint32_t read_bytes, uint32_t zero_bytes){
     /*printf("[ page.c / add_mmap_to_page_table ] :: read_bytes : %d\n",read_bytes);*/
@@ -135,3 +139,54 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
     //printf("[ page.c / add_mmap_to_page_table ] :: success\n");
     return true;
 }
+
+ uint8_t *evict_page ()
+ {
+     printf ("Failed1!\n");//debugging
+    if(list_empty (&frame_list))
+        return NULL;
+    clock=list_begin(&frame_list);
+    while(true)
+    {       
+        if(clock==&frame_list.tail)
+            clock = list_begin (&frame_list);
+        printf ("Failed2!\n");//debugging
+        struct page *p = list_entry (clock,struct page,frame_elem);
+        if (pagedir_is_accessed (thread_current()->pagedir,p->virtual_address))
+        {
+            printf ("Failed3!\n");//debugging
+            pagedir_set_accessed (thread_current()->pagedir,p->virtual_address,false);    
+        } 
+        else
+        {
+            if(pagedir_is_dirty (thread_current()->pagedir,p->virtual_address) || p->type==SWAP_PAGE)
+            {
+                printf ("Failed4!\n");//debugging
+                if (p->type==MMAP_PAGE)
+                {
+                    file_write_at (p->file,p->physical_address,p->read_bytes,p->offset);
+                }
+                else
+                {
+                    p->type=SWAP_PAGE;
+                    size_t slot = bitmap_scan_and_flip (swap_table,0,1,false);
+                    for(size_t i=0;i<8;i++)
+                        block_write (swap_block,8*slot+i,p->physical_address+i*BLOCK_SECTOR_SIZE);
+                    p->swap_slot=slot;
+                    printf ("Failed5!\n");//debugging
+                }     
+            }
+            pagedir_clear_page (thread_current ()->pagedir,p->virtual_address);
+            palloc_free_page (p->physical_address);
+            list_remove (&p->frame_elem);
+            p->physical_address=NULL;
+            printf ("Failed6!\n");//debugging
+            break;
+            
+        }
+        clock = list_next (clock);
+    }
+    
+    return palloc_get_page (PAL_USER);
+
+ }

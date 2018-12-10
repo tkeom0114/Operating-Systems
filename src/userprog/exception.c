@@ -10,7 +10,10 @@
 #include "threads/palloc.h"//added at 11/27 20:55
 #include "threads/vaddr.h"//added at 11/27 20:55
 #ifdef VM
-  #include "vm/page.h"
+#include "vm/page.h"
+#include <bitmap.h>
+#include "devices/block.h"
+
 #endif
 
 
@@ -173,7 +176,16 @@ page_fault (struct intr_frame *f)
     {
       uint8_t *kpage = palloc_get_page (PAL_USER);
       if(kpage == NULL)
-        sys_exit (-1);
+      {
+        //printf ("Failed!\n");//debugging
+        kpage = evict_page ();
+        if(kpage == NULL)
+        {
+          //printf ("Failed!\n");//debugging
+          sys_exit (-1);
+        }
+      }
+    //pintos -v -k -T 300 --qemu  --filesys-size=2 -p tests/vm/page-linear -a page-linear --swap-size=4 -- -q  -f run page-linear
       success = install_page (p->virtual_address,kpage,p->writable);
       if (!success)
       {
@@ -187,9 +199,17 @@ page_fault (struct intr_frame *f)
       list_push_back (&frame_list,&p->frame_elem);
     }
     else if(p->type == MMAP_PAGE){
-       uint8_t *kpage = palloc_get_page(PAL_USER);
-       if(kpage == NULL)
-           sys_exit(-1);
+      uint8_t *kpage = palloc_get_page(PAL_USER);
+      if(kpage == NULL)
+      {
+        //printf ("Failed!\n");//debugging
+        kpage = evict_page ();
+        if(kpage == NULL)
+        {
+          //printf ("Failed!\n");//debugging
+          sys_exit (-1);
+        }
+      }
        /*printf("[ exception.c / page_fault ] :: p->read_bytes = %d\n",p->read_bytes);*/
        success = install_page (p->virtual_address, kpage, p->writable);
        /*printf("[ exception.c / page_fault ] :: p->read_bytes = %d\n",p->read_bytes);*/
@@ -204,6 +224,31 @@ page_fault (struct intr_frame *f)
            sys_exit(-1);
        memset(kpage + p->read_bytes, 0, p->zero_bytes);
        list_push_back (&frame_list,&p->frame_elem);
+    }
+    else if(SWAP_PAGE)
+    {
+      uint8_t *kpage = palloc_get_page (PAL_USER);
+      if(kpage == NULL)
+      {
+        //printf ("Failed!\n");//debugging
+        kpage = evict_page ();
+        if(kpage == NULL)
+        {
+          //printf ("Failed!\n");//debugging
+          sys_exit (-1);
+        }
+          
+      }
+      success = install_page (p->virtual_address,kpage,p->writable);
+      if (!success)
+      {
+        palloc_free_page (kpage);
+        sys_exit (-1);
+      }
+      bitmap_flip (swap_table,p->swap_slot);
+      for(int i=0;i<8;i++)
+        block_read (swap_block,8*p->swap_slot+i,kpage+i*BLOCK_SECTOR_SIZE);
+      p->swap_slot = -1;
     }
     if(success)
       return;

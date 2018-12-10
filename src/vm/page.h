@@ -33,8 +33,8 @@ struct page
 	size_t swap_slot;//disk로 swap된 경우 어느 slot에 있는지 알려줌
 };
 struct list frame_list;//frame table
-struct list_elem clock;//clock algorithm에서 가리키는 page의 list_elem
-struct bitmap swap_table;//swap_table
+struct list_elem *clock;//clock algorithm에서 가리키는 page의 list_elem
+struct bitmap *swap_table;//swap_table
 struct block *swap_block;
 size_t swap_size;
 
@@ -45,6 +45,7 @@ struct page *find_page (struct hash *supp_page_table, void *virtual_address);
 void page_destroy_func (struct hash_elem*e, void *aux);
 void destroy_page_table (struct hash *supp_page_table);
 struct page* grow_stack (void *ptr, void *esp);
+uint8_t *evict_page ();
 
 bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
         uint32_t read_bytes, uint32_t zero_bytes);
