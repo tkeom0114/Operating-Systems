@@ -46,7 +46,12 @@ void page_destroy_func (struct hash_elem*e, void *aux);
 void destroy_page_table (struct hash *supp_page_table);
 struct page* grow_stack (void *ptr, void *esp);
 uint8_t *evict_page (uint8_t flag);
+bool get_frame(void *fault_addr,void *esp,bool write);
 
 bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
         uint32_t read_bytes, uint32_t zero_bytes);
 #endif
+
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/page-parallel -a page-parallel -p tests/vm/child-linear -a child-linear --swap-size=4 -- -q  -f run page-parallel
+
+//pintos -v -k -T 600 --qemu  --filesys-size=2 -p tests/vm/page-merge-par -a page-merge-par -p tests/vm/child-sort -a child-sort --swap-size=4 -- -q  -f run page-merge-par

@@ -55,7 +55,10 @@ struct page* check_address (void *ptr, void *esp)//fixed at 11/28 13:02
   {
     p = grow_stack (ptr,esp);
     if (p == NULL)
+    {
       sys_exit (-1);
+    }
+      
   }
   return p;
 }
@@ -71,15 +74,21 @@ void check_buffer(void* buffer, unsigned size, void* esp, bool to_write)
   while (cur_size > 0)
   {
     p = check_address ((void*)cur_buffer,esp);
-
+    //printf("virtual address:%lx,%d\n",p->virtual_address,p->writable);//debugging
     if (!p->writable && to_write)
+    {
       sys_exit (-1);
+    }
+      
     cur_buffer += PGSIZE;
     cur_size -= PGSIZE;
   }
   p = check_address (buffer + size,esp);
   if (!p->writable && to_write)
-      sys_exit (-1);
+  {
+    sys_exit (-1);
+  }
+      
   return ;
 }
 
@@ -143,6 +152,8 @@ Made by Taekang Eom
 Time: 10/10 14:07 */
 void sys_exit (int status)
 {
+  if (lock_held_by_current_thread(&file_lock))
+		lock_release(&file_lock);
   struct thread *t = thread_current ();
   t->exit_status = status;
   printf("%s: exit(%d)\n", t->name, status);
@@ -188,7 +199,10 @@ bool sys_create (const char *file , unsigned initial_size, void *esp)
   #endif
   /*printf("[ syscall.c / sys_create ] :: name : %s init_size = %d\n",file, (int)initial_size);*/
   if (file == NULL)
+  {
     sys_exit (-1);
+  }
+    
   lock_acquire (&file_lock);
   bool success = filesys_create (file,initial_size);
   lock_release (&file_lock);
@@ -207,7 +221,10 @@ bool sys_remove (const char *file, void *esp)
   check_string (file,esp);
   #endif
   if (file == NULL)
+  {
     sys_exit (-1);
+  }
+    
   lock_acquire (&file_lock);
   bool success;
   success = filesys_remove (file);
@@ -227,7 +244,10 @@ int sys_open (const char *file, void *esp)
   check_string (file,esp);
   #endif
   if(file == NULL)
+  {
     sys_exit (-1);
+  }
+    
   lock_acquire (&file_lock);
   int fd;
   struct thread *cur = thread_current ();
@@ -267,13 +287,15 @@ Made by Taekang Eom
 Time: 10/29 23:17*/
 int sys_read (int fd, void *buffer, unsigned size, void *esp)
 {
+  
   #ifndef VM
   check_address (buffer,esp);
   check_address (buffer+size,esp);
   #else
   check_buffer (buffer,size,esp,true);
   #endif
-  lock_acquire (&file_lock);
+  //pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/userprog/read-normal -a read-normal -p ../../tests/userprog/sample.txt -a sample.txt --swap-size=4 -- -q  -f run read-normal
+  
   int return_size;
   if (fd == 0)
   {
@@ -283,14 +305,55 @@ int sys_read (int fd, void *buffer, unsigned size, void *esp)
     return_size = -1;
   else
   {
+    lock_acquire (&file_lock);
+    
     struct file *reading_file = get_file (fd);
+    lock_release (&file_lock);
+    
     if (reading_file == NULL)
       return_size = -1;
     else
+    {
+      #ifndef VM
+      lock_acquire (&file_lock);
       return_size = file_read (reading_file,buffer,size);
+      lock_release (&file_lock);
+      #else
+      int cur_size = (int)size;
+      void *cur_buffer = (void*)buffer;
+      unsigned int offset = 0;
+	    size_t read_bytes = 0;
+	    size_t left = 0;
+      return_size = 0;
+      while (cur_size>0)
+      {
+        bool success = get_frame (cur_buffer,esp,true);
+        if(!success)
+        {
+          sys_exit (-1);
+        }
+          
+        offset = cur_buffer - pg_round_down(cur_buffer);
+			
+        left = offset + cur_size;
+			  if (left > PGSIZE)
+			    read_bytes = cur_size - left + PGSIZE;
+		  	else
+			    read_bytes = cur_size;
+        lock_acquire (&file_lock);
+        return_size = return_size+file_read (reading_file,cur_buffer,read_bytes);
+        lock_release (&file_lock);
+        cur_buffer = cur_buffer+read_bytes;
+        cur_size = cur_size - read_bytes;
+      }
+
+        #endif
+    }
+      
   }
 
-  lock_release (&file_lock);
+  //pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/page-parallel -a page-parallel -p tests/vm/child-linear -a child-linear --swap-size=4 -- -q  -f run page-parallel
+
   return return_size;
 }
 
@@ -305,7 +368,7 @@ int sys_write (int fd, void *buffer, unsigned size,void *esp)
   #else
   check_buffer (buffer,size,esp,false);
   #endif
-  lock_acquire (&file_lock);
+  
   int return_size;
   if (fd == 1)
   {
@@ -317,13 +380,51 @@ int sys_write (int fd, void *buffer, unsigned size,void *esp)
     return_size = -1;
   else
   {
+    lock_acquire (&file_lock);
     struct file *writing_file = get_file (fd);
+    lock_release (&file_lock);
     if (writing_file == NULL)
       return_size = -1;
     else
+    {
+      #ifndef VM
+      lock_acquire (&file_lock);
       return_size = file_write (writing_file,buffer,size);
+      lock_release (&file_lock);
+      #else
+      int cur_size = (int)size;
+      void *cur_buffer = (void*)buffer;
+      unsigned int offset = 0;
+	    size_t write_bytes = 0;
+	    size_t left = 0;
+      return_size = 0;
+      while (cur_size>0)
+      {
+        bool success = get_frame (cur_buffer,esp,false);
+        if(!success)
+        {
+          sys_exit (-1);
+        }
+          
+        offset = cur_buffer - pg_round_down(cur_buffer);
+			
+        left = offset + cur_size;
+			  if (left > PGSIZE)
+			    write_bytes = cur_size - left + PGSIZE;
+		  	else
+			    write_bytes = cur_size;
+        lock_acquire (&file_lock);
+        return_size = return_size+file_write (writing_file,cur_buffer,write_bytes);
+        lock_release (&file_lock);
+        cur_buffer = cur_buffer+write_bytes;
+        cur_size = cur_size - write_bytes;
+      }
+
+        #endif
+    }
+      
   }
-  lock_release (&file_lock);
+  
   return return_size;
 }
 

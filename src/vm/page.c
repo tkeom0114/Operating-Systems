@@ -7,6 +7,8 @@
 #include "threads/thread.h"
 #include "threads/palloc.h"
 #include "userprog/pagedir.h"
+#include "userprog/exception.h"
+#include "userprog/syscall.h"
 #include "devices/block.h"
 #include <stdio.h>
 
@@ -155,11 +157,13 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
 
  uint8_t *evict_page (uint8_t flag)
  {
+    
      //printf ("Failed1!\n");//debugging
     if(list_empty (&frame_list))
     {
         return NULL;
-    }      
+    }    
+    //lock_acquire (&evict_lock);  
     struct list_elem *clock=list_begin(&frame_list);
     while(true)
     {       
@@ -181,7 +185,9 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
                 //printf ("Failed4!\n");//debugging
                 if (p->type==MMAP_PAGE)
                 {
+                    lock_acquire (&file_lock);
                     file_write_at (p->file,p->physical_address,p->read_bytes,p->offset);
+                    lock_release (&file_lock);
                 }
                 else
                 {
@@ -199,7 +205,7 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
             p->physical_address=NULL;
             //printf ("Failed6!\n");//debugging
             break;
-            
+            //lock_acquire (&evict_lock);
         }
         clock = list_next (clock);
     }
@@ -207,3 +213,121 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
     return palloc_get_page (flag);
 
  }
+
+bool get_frame(void *fault_addr,void *esp,bool write)
+{
+    
+    struct page *p = find_page (&thread_current ()->supp_page_table,fault_addr);
+    bool success = false;
+    //stack growth(added 11/28 18:10)
+    if (p == NULL )
+    {
+      if (grow_stack (fault_addr,esp))
+      {
+          return true;
+      }  
+      else
+      {
+        return false;
+      }
+        
+    }
+    if (!p->writable && write)
+        return false;
+    if (p->physical_address!=NULL)
+        return true;
+        
+    //load execute file
+    if(p->type == EXE_PAGE)
+    {
+        //printf ("Failed!\n");//debugging
+      uint8_t *kpage = palloc_get_page (PAL_USER);
+      if(kpage == NULL)
+      {
+        kpage = evict_page (PAL_USER);
+        if(kpage == NULL)
+        {
+          return false;
+        }
+      }
+    //pintos -v -k -T 300 --qemu  --filesys-size=2 -p tests/vm/page-linear -a page-linear --swap-size=4 -- -q  -f run page-linear
+      success = install_page (p->virtual_address,kpage,p->writable);
+      if (!success)
+      {
+        palloc_free_page (kpage);
+        return false;
+      }     
+      p->physical_address = kpage;
+      lock_acquire (&file_lock);
+      size_t result = file_read_at (p->file,kpage,p->read_bytes,p->offset);
+      lock_release (&file_lock);
+      if (result != p->read_bytes)
+      {
+        return false;
+      }
+        
+      memset (kpage + p->read_bytes, 0, p->zero_bytes);
+      list_push_back (&frame_list,&p->frame_elem);
+    }
+    else if(p->type == MMAP_PAGE){
+      uint8_t *kpage = palloc_get_page(PAL_USER);
+      if(kpage == NULL)
+      {
+        //printf ("Failed!\n");//debugging
+        kpage = evict_page (PAL_USER);
+        if(kpage == NULL)
+        {
+          //printf ("Failed!\n");//debugging
+          return false;
+        }
+      }
+       /*printf("[ exception.c / page_fault ] :: p->read_bytes = %d\n",p->read_bytes);*/
+       success = install_page (p->virtual_address, kpage, p->writable);
+       /*printf("[ exception.c / page_fault ] :: p->read_bytes = %d\n",p->read_bytes);*/
+       if(!success){
+           palloc_free_page(kpage);
+           return false;
+       }       
+       p->physical_address = kpage;
+       /*printf("[ exception.c / page_fault ] :: p->read_bytes = %d\n",p->read_bytes);*/
+       /*printf("[ exception.c / page_fault ] :: p->offset     = %d\n",p->offset);*/
+       lock_acquire (&file_lock);
+        size_t result = file_read_at(p->file,kpage,p->read_bytes,p->offset);
+        lock_release (&file_lock);
+        if (result != p->read_bytes)
+        {
+         return false;
+        }
+           
+       memset(kpage + p->read_bytes, 0, p->zero_bytes);
+       list_push_back (&frame_list,&p->frame_elem);
+    }
+    else if(SWAP_PAGE)
+    {
+      uint8_t *kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+      if(kpage == NULL)
+      {
+        //printf ("Failed!\n");//debugging
+        kpage = evict_page (PAL_USER | PAL_ZERO);
+        if(kpage == NULL)
+        {
+          //printf ("Failed!\n");//debugging
+          return false;
+        }
+          
+      }
+      success = install_page (p->virtual_address,kpage,p->writable);
+      if (!success)
+      {
+        palloc_free_page (kpage);
+        return false;
+      }
+      bitmap_flip (swap_table,p->swap_slot);
+      for(int i=0;i<8;i++)
+        block_read (swap_block,8*p->swap_slot+i,kpage+i*BLOCK_SECTOR_SIZE);
+      p->swap_slot = -1;
+      p->physical_address = kpage;
+      list_push_back (&frame_list,&p->frame_elem);
+    }
+    return success;
+}
