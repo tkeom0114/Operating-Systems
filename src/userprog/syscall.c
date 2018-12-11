@@ -327,7 +327,7 @@ int sys_read (int fd, void *buffer, unsigned size, void *esp)
       return_size = 0;
       while (cur_size>0)
       {
-        bool success = get_frame (cur_buffer,esp,true);
+        bool success = get_frame (cur_buffer,esp);
         if(!success)
         {
           sys_exit (-1);
@@ -400,7 +400,7 @@ int sys_write (int fd, void *buffer, unsigned size,void *esp)
       return_size = 0;
       while (cur_size>0)
       {
-        bool success = get_frame (cur_buffer,esp,false);
+        bool success = get_frame (cur_buffer,esp);
         if(!success)
         {
           sys_exit (-1);

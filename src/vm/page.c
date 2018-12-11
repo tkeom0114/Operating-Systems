@@ -9,6 +9,7 @@
 #include "userprog/pagedir.h"
 #include "userprog/exception.h"
 #include "userprog/syscall.h"
+#include "filesys/file.h"
 #include "devices/block.h"
 #include <stdio.h>
 
@@ -43,6 +44,12 @@ bool delete_page (struct hash *supp_page_table, struct page *p)
     {
         list_remove (&p->frame_elem);
     }
+    if(p->physical_address==NULL && p->type==SWAP_PAGE)
+    {
+        lock_acquire (&swap_lock);
+        bitmap_reset(swap_table,p->swap_slot);
+        lock_release (&swap_lock);
+    }
     free(p);
     return (e != NULL);
 }
@@ -67,6 +74,12 @@ void page_destroy_func (struct hash_elem *e, void *aux)
     if(p->physical_address != NULL)
     {
         list_remove (&p->frame_elem);
+    }
+    if(p->physical_address==NULL && p->type==SWAP_PAGE)
+    {
+        lock_acquire (&swap_lock);
+        bitmap_reset(swap_table,p->swap_slot);
+        lock_release (&swap_lock);
     }
     free(p);
 }
@@ -163,7 +176,7 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
     {
         return NULL;
     }    
-    //lock_acquire (&evict_lock);  
+    lock_acquire (&evict_lock);  
     struct list_elem *clock=list_begin(&frame_list);
     while(true)
     {       
@@ -189,23 +202,25 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
                     file_write_at (p->file,p->physical_address,p->read_bytes,p->offset);
                     lock_release (&file_lock);
                 }
-                else
+                else 
                 {
                     p->type=SWAP_PAGE;
+                    lock_acquire (&swap_lock);
                     size_t slot = bitmap_scan_and_flip (swap_table,0,1,false);
                     for(size_t i=0;i<8;i++)
                         block_write (swap_block,8*slot+i,p->physical_address+i*BLOCK_SECTOR_SIZE);
                     p->swap_slot=slot;
+                    lock_release (&swap_lock);
                     //printf ("Failed5!\n");//debugging
                 }     
             }
             list_remove (&p->frame_elem);
-            pagedir_clear_page (thread_current ()->pagedir,p->virtual_address);
-            palloc_free_page (p->physical_address);         
+            palloc_free_page (p->physical_address); 
+            pagedir_clear_page (thread_current ()->pagedir,p->virtual_address);      
             p->physical_address=NULL;
             //printf ("Failed6!\n");//debugging
+            lock_release (&evict_lock);
             break;
-            //lock_acquire (&evict_lock);
         }
         clock = list_next (clock);
     }
@@ -214,29 +229,15 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
 
  }
 
-bool get_frame(void *fault_addr,void *esp,bool write)
+bool get_frame(void *fault_addr,void *esp)
 {
     
     struct page *p = find_page (&thread_current ()->supp_page_table,fault_addr);
+    if(p==NULL)
+        return false;
     bool success = false;
-    //stack growth(added 11/28 18:10)
-    if (p == NULL )
-    {
-      if (grow_stack (fault_addr,esp))
-      {
-          return true;
-      }  
-      else
-      {
-        return false;
-      }
-        
-    }
-    if (!p->writable && write)
-        return false;
-    if (p->physical_address!=NULL)
+    if(p->physical_address!=NULL)
         return true;
-        
     //load execute file
     if(p->type == EXE_PAGE)
     {
@@ -291,7 +292,7 @@ bool get_frame(void *fault_addr,void *esp,bool write)
        p->physical_address = kpage;
        /*printf("[ exception.c / page_fault ] :: p->read_bytes = %d\n",p->read_bytes);*/
        /*printf("[ exception.c / page_fault ] :: p->offset     = %d\n",p->offset);*/
-       lock_acquire (&file_lock);
+        lock_acquire (&file_lock);
         size_t result = file_read_at(p->file,kpage,p->read_bytes,p->offset);
         lock_release (&file_lock);
         if (result != p->read_bytes)
@@ -322,12 +323,14 @@ bool get_frame(void *fault_addr,void *esp,bool write)
         palloc_free_page (kpage);
         return false;
       }
+      lock_acquire (&swap_lock);
       bitmap_flip (swap_table,p->swap_slot);
       for(int i=0;i<8;i++)
         block_read (swap_block,8*p->swap_slot+i,kpage+i*BLOCK_SECTOR_SIZE);
       p->swap_slot = -1;
       p->physical_address = kpage;
       list_push_back (&frame_list,&p->frame_elem);
+      lock_release (&swap_lock);
     }
     return success;
 }

@@ -113,6 +113,7 @@ thread_init (void)
     lock_init (&evict_lock);
     list_init (&frame_list);
     lock_init (&fault_lock);
+    lock_init (&swap_lock);
     
   #endif
 }

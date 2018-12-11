@@ -162,8 +162,25 @@ page_fault (struct intr_frame *f)
 
   #ifdef VM//added at 11/27 21:09
 
-    bool success=get_frame(fault_addr,f->esp,write);
-    if(success)
+    struct page *p = find_page (&thread_current ()->supp_page_table,fault_addr);
+    bool success = false;
+    //stack growth(added 11/28 18:10)
+    if (p == NULL )
+    {
+      if (grow_stack (fault_addr,f->esp))
+      {
+          return ;
+      }  
+      else
+      {
+        sys_exit (-1);
+      }
+        
+    }
+    if (!p->writable && write)
+        sys_exit (-1);
+        
+    if(get_frame (fault_addr,f->esp))
     {
       return;
     }
