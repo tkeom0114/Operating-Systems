@@ -36,8 +36,10 @@ struct list frame_list;//frame table
 struct bitmap *swap_table;//swap_table
 struct block *swap_block;
 size_t swap_size;
+struct lock load_lock;
 struct lock evict_lock;
 struct lock swap_lock;
+struct lock frame_lock;
 
 void page_table_init (struct hash *supp_page_table);
 bool insert_page (struct hash *supp_page_table, struct page *p);
@@ -56,3 +58,7 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
 //pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/page-parallel -a page-parallel -p tests/vm/child-linear -a child-linear --swap-size=4 -- -q  -f run page-parallel
 
 //pintos -v -k -T 600 --qemu  --filesys-size=2 -p tests/vm/page-merge-par -a page-merge-par -p tests/vm/child-sort -a child-sort --swap-size=4 -- -q  -f run page-merge-par
+
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/page-merge-stk -a page-merge-stk -p tests/vm/child-qsort -a child-qsort --swap-size=4 -- -q  -f run page-merge-stk
+
+//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/page-merge-mm -a page-merge-mm -p tests/vm/child-qsort-mm -a child-qsort-mm --swap-size=4 -- -q  -f run page-merge-mm

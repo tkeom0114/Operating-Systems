@@ -618,7 +618,9 @@ setup_stack (void **esp, char *file_name)
     palloc_free_page (kpage);
     return false;
   }
+  lock_acquire (&frame_lock);
   list_push_back(&frame_list,&p->frame_elem);
+  lock_release (&frame_lock);
   success = true;
 #endif
   /*Push arguments to stack

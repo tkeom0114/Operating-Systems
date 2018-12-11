@@ -114,6 +114,8 @@ thread_init (void)
     list_init (&frame_list);
     lock_init (&fault_lock);
     lock_init (&swap_lock);
+    lock_init (&frame_lock);
+    lock_init (&load_lock);
     
   #endif
 }

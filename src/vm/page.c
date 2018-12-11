@@ -42,7 +42,9 @@ bool delete_page (struct hash *supp_page_table, struct page *p)
     struct hash_elem *e = hash_delete (supp_page_table,&p->page_elem);
     if(p->physical_address != NULL)
     {
+        lock_acquire (&frame_lock);
         list_remove (&p->frame_elem);
+        lock_release (&frame_lock);
     }
     if(p->physical_address==NULL && p->type==SWAP_PAGE)
     {
@@ -73,7 +75,9 @@ void page_destroy_func (struct hash_elem *e, void *aux)
     struct page *p = hash_entry (e,struct page,page_elem);
     if(p->physical_address != NULL)
     {
+        lock_acquire (&frame_lock);
         list_remove (&p->frame_elem);
+        lock_release (&frame_lock);
     }
     if(p->physical_address==NULL && p->type==SWAP_PAGE)
     {
@@ -83,7 +87,6 @@ void page_destroy_func (struct hash_elem *e, void *aux)
     }
     free(p);
 }
-//pintos -v -k -T 60 --qemu  --filesys-size=2 -p tests/vm/mmap-overlap -a mmap-overlap -p tests/vm/zeros -a zeros --swap-size=4 -- -q  -f run mmap-overlap
 
 void destroy_page_table (struct hash *supp_page_table)
 {
@@ -133,7 +136,9 @@ struct page* grow_stack (void *ptr, void *esp)
         palloc_free_page (kpage);
         return NULL;
     }
+    lock_acquire (&frame_lock);
     list_push_back (&frame_list,&p->frame_elem);
+    lock_release (&frame_lock);
     return p;
 }
 
@@ -170,22 +175,28 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
 
  uint8_t *evict_page (uint8_t flag)
  {
-    
+    uint8_t *kpage;
      //printf ("Failed1!\n");//debugging
     if(list_empty (&frame_list))
     {
         return NULL;
     }    
-    lock_acquire (&evict_lock);  
+    lock_acquire (&evict_lock); 
+    lock_acquire (&frame_lock);
     struct list_elem *clock=list_begin(&frame_list);
+    lock_release (&frame_lock);
     while(true)
     {       
         if(clock==list_end(&frame_list))
         {
+            lock_acquire (&frame_lock);
             clock = list_begin (&frame_list);
+            lock_release (&frame_lock);
         }
         //printf ("Failed2!\n");//debugging
+        lock_acquire (&frame_lock);
         struct page *p = list_entry (clock,struct page,frame_elem);
+        lock_release (&frame_lock);
         if (pagedir_is_accessed (thread_current()->pagedir,p->virtual_address))
         {
             //printf ("Failed3!\n");//debugging
@@ -214,18 +225,21 @@ bool add_mmap_to_page_table(struct file *file, int32_t offset, uint8_t *upage,
                     //printf ("Failed5!\n");//debugging
                 }     
             }
+            lock_acquire (&frame_lock);
             list_remove (&p->frame_elem);
+            lock_release (&frame_lock);
             palloc_free_page (p->physical_address); 
             pagedir_clear_page (thread_current ()->pagedir,p->virtual_address);      
             p->physical_address=NULL;
             //printf ("Failed6!\n");//debugging
-            lock_release (&evict_lock);
-            break;
+            kpage = palloc_get_page(flag);
+            if(kpage!=NULL)
+                break;
         }
         clock = list_next (clock);
     }
-    
-    return palloc_get_page (flag);
+    lock_release (&evict_lock);
+    return kpage;
 
  }
 
@@ -268,7 +282,9 @@ bool get_frame(void *fault_addr,void *esp)
       }
         
       memset (kpage + p->read_bytes, 0, p->zero_bytes);
+      lock_acquire (&frame_lock);
       list_push_back (&frame_list,&p->frame_elem);
+      lock_release (&frame_lock);
     }
     else if(p->type == MMAP_PAGE){
       uint8_t *kpage = palloc_get_page(PAL_USER);
@@ -301,7 +317,9 @@ bool get_frame(void *fault_addr,void *esp)
         }
            
        memset(kpage + p->read_bytes, 0, p->zero_bytes);
+       lock_acquire (&frame_lock); 
        list_push_back (&frame_list,&p->frame_elem);
+       lock_release (&frame_lock);
     }
     else if(SWAP_PAGE)
     {
@@ -329,7 +347,9 @@ bool get_frame(void *fault_addr,void *esp)
         block_read (swap_block,8*p->swap_slot+i,kpage+i*BLOCK_SECTOR_SIZE);
       p->swap_slot = -1;
       p->physical_address = kpage;
+      lock_acquire (&frame_lock);
       list_push_back (&frame_list,&p->frame_elem);
+      lock_release (&frame_lock);
       lock_release (&swap_lock);
     }
     return success;

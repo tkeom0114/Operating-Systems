@@ -53,7 +53,9 @@ struct page* check_address (void *ptr, void *esp)//fixed at 11/28 13:02
   struct page *p = find_page(&thread_current ()->supp_page_table,ptr);
   if(p == NULL)
   {
+    lock_acquire (&load_lock);
     p = grow_stack (ptr,esp);
+    lock_release (&load_lock);
     if (p == NULL)
     {
       sys_exit (-1);
@@ -327,7 +329,9 @@ int sys_read (int fd, void *buffer, unsigned size, void *esp)
       return_size = 0;
       while (cur_size>0)
       {
+        lock_acquire (&load_lock);
         bool success = get_frame (cur_buffer,esp);
+        lock_release (&load_lock);
         if(!success)
         {
           sys_exit (-1);
@@ -400,7 +404,9 @@ int sys_write (int fd, void *buffer, unsigned size,void *esp)
       return_size = 0;
       while (cur_size>0)
       {
+        lock_acquire (&load_lock);
         bool success = get_frame (cur_buffer,esp);
+        lock_release (&load_lock);
         if(!success)
         {
           sys_exit (-1);
@@ -491,6 +497,7 @@ syscall_handler (struct intr_frame *f)
   check_address(f->esp,f->esp);
   int arg[3];
   int syscall_num = *(int*)f->esp;
+  //printf("syscall num %d start!\n",syscall_num);//debugging
   switch(syscall_num)
   {
     case SYS_HALT:
@@ -563,6 +570,7 @@ syscall_handler (struct intr_frame *f)
       sys_munmap(arg[0]);
       break;
   }
+  //printf("syscall num %d end!\n",syscall_num);//debugging
 }
 int sys_mmap (int fd, void *addr)
 {

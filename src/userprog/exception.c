@@ -167,7 +167,10 @@ page_fault (struct intr_frame *f)
     //stack growth(added 11/28 18:10)
     if (p == NULL )
     {
-      if (grow_stack (fault_addr,f->esp))
+      lock_acquire (&load_lock);
+      bool stack_generate = grow_stack (fault_addr,f->esp);
+      lock_release (&load_lock);
+      if (stack_generate)
       {
           return ;
       }  
@@ -179,8 +182,10 @@ page_fault (struct intr_frame *f)
     }
     if (!p->writable && write)
         sys_exit (-1);
-        
-    if(get_frame (fault_addr,f->esp))
+    lock_acquire (&load_lock);
+    bool load =  get_frame (fault_addr,f->esp);
+    lock_release (&load_lock);
+    if(load)
     {
       return;
     }
