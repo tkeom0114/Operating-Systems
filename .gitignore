@@ -9,6 +9,7 @@
 *.toc
 *.tp
 *.vr
+*.html
 /pintos.fns
 /pintos.tps
 /pintos.vrs
