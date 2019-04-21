@@ -1,0 +1,19 @@
+src/utils/Pintos.pm
+$name = find_file ("/home/pintos/pintos-anon/src/threads/build/loader.bin") if !defined $name;
+to
+$name = find_file ("loader.bin") if !defined $name;
+in line 362
+
+src/utils/pintos
+my $name = find_file ('/home/pintos/pintos-anon/src/threads/build/kernel.bin');
+to 
+my $name = find_file ('kernel.bin');
+in line 257
+ssh team19@141.223.121.75
+
+id:team19
+pw:1pintos9
+
+gui debugger nemiver
+
+현재 synch.c의 lock_aquire, release의 ASSERT부분을 수정한 상태
